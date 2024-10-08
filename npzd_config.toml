@@ -1,4 +1,4 @@
-[Parameter]
+[PARAMETER]
 Vp0 = 2.5 # max. rate photosynthesis, g C (g chl)-1 h-1
 alpha = 0.15 # initial slope of P-I curve, g C (g chl)-1 h-1 (W m-2)-1
 kN = 0.85 # half saturation constant for N uptake, mmol m-3
@@ -16,22 +16,25 @@ VD = 6.43 # detritus sinking rate, m d-1
 mD = 0.06 # detritus remineralisation rate, d-1
 wmix = 0.13 # cross-thermocline mixing rate, m d-1
 CtoChl = 75.0 # carbon to chlorophyll ratio, g g-1
+albedo = 0.04
+solarconst = 1368 # solar constant, w m-2
+parrac = 0.43 #PAR fraction
 kw = 0.04 # light attenuation by water, m-1
 kc = 0.03 # light attenuation by phyto., (mmol N m-3)-1
 
-[Setup]
+[SETUP]
 Pinit = 0.1 # initial P, mmol N m-3
 Ninit = 10.0 # initial N, mmol m-3
 Zinit = 0.1 # initial Z, mmol N m-3
 Dsinit = 0.1 # initial Ds, mmol N m-3
-delta_t = 0.1 # time step, day
-nyears = 5 # run duration, years (1 year= 365 days)
+delta_t = 1 # time step, hour
+nyears = 2 # run duration, years (1 year= 365 days)
 flag_stn = 2 # station; 1=India (60N 20W), 2=Biotrans (47N 20W), 3=Kerfix (50 40’S 68 25’E), 4=Papa (50N, 145W)
-flag_LI = 3 # 1=numeric; 2=Evans & Parslow (1985); 3=Anderson (1993)
-flag_atten = 2 # 1: kw+kcP (one layer for ML); 2: Anderson (1993) (spectral, layers 0-5, 5-23, >23 m)
-flag_irrad = 2 # 1=triangular over day; 2=sinusoidal over day
+
+## light limitation
+flag_LI = 2 # 1=numeric; 2=Evans & Parslow (1985); 3=Anderson (1993)
+flag_atten = 1 # 1: kw+kcP (one layer for ML); 2: Anderson (1993) (spectral, layers 0-5, 5-23, >23 m)
 flag_PIcurve = 1 # 1=Smith fn; 2=exponential fn
+
+flag_irrad = 2 # 1=triangular over day; 2=sinusoidal over day
 flag_grazing = 2 # (1) phihat_i = phi_i, (2) phihat_i = phi_i*P_i
-flag_outtype = 1 # output to files: 0=none, 1=last year only, 2=whole simulation
-flag_outfreq = 0 # frequency for writing output: 1=every day, 0=every time step
-flag_integ = 1 # choice of integration method: 0=Euler, 1=Runge Kutta 4
