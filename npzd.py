@@ -49,10 +49,12 @@ class NPZDModel:
         return daily_data
 
     def day_length(self, day):
+        """calculate day length in hours"""
         declin = 23.45 * np.sin(2 * np.pi * (284 + day) * 0.00274) * np.pi / 180
         return 24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
 
     def noon_par(self, day):
+        """Calculation of noon irradiance"""
         declin = 23.45 * np.sin(2 * np.pi * (284 + day) * 0.00274) * np.pi / 180
         coszen = np.sin(self.latitude) * np.sin(declin) + np.cos(self.latitude) * np.cos(declin)
         zen = np.arccos(coszen)
@@ -71,6 +73,7 @@ class NPZDModel:
         
         MLDnow = self.MLD[day]
 
+        ## deep-water nitrate concentration
         N0 = self.station_settings["aN"] * MLDnow + self.station_settings["bN"]
         VpT = self.params["Vp0"] * 1.066**self.SST[day]
         noonparnow = self.noon_par(day)
@@ -137,10 +140,14 @@ class NPZDModel:
         plt.show()
 
 # Usage
-if __name__ == "__main__":
+def main():
     model = NPZDModel("npzd_config.toml")
     t, solution = model.run_simulation()
     ## cut the first year
     t = t[365:]
     solution = solution[365:]    
     model.plot_results(t, solution)
+    
+
+if __name__ == "__main__":
+    main()
