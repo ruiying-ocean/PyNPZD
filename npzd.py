@@ -4,6 +4,8 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import tomli
 
+from photosynthesis import *
+
 class NPZDModel:
     def __init__(self, config_file):
         self.load_config(config_file)
@@ -51,17 +53,31 @@ class NPZDModel:
     def day_length(self, day):
         """calculate day length in hours"""
         declin = 23.45 * np.sin(2 * np.pi * (284 + day) * 0.00274) * np.pi / 180
-        return 24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
+        daylnow =  24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
+        return daylnow
+
 
     def noon_par(self, day):
         """Calculation of noon irradiance"""
+        albedo = 0.04 # albedo
+        solarconst = 1368.0 # solar constant, w m-2
+        parrac = 0.43 # PAR fraction
+
+        # solar declination angle
         declin = 23.45 * np.sin(2 * np.pi * (284 + day) * 0.00274) * np.pi / 180
+        # cosine of zenith angle
         coszen = np.sin(self.latitude) * np.sin(declin) + np.cos(self.latitude) * np.cos(declin)
         zen = np.arccos(coszen)
+        # Earth's radius vector
         Rvector = 1 / np.sqrt(1 + 0.033 * np.cos(2 * np.pi * day * 0.00274))
-        Iclear = 1368 * coszen**2 / (Rvector**2) / (1.2 * coszen + self.station_settings["e0"] * (1.0 + coszen) * 0.001 + 0.0455)
+        # irradiance at ocean surface, clear sky
+        Iclear = solarconst * coszen**2 / (Rvector**2) / (1.2 * coszen + self.station_settings["e0"] * (1.0 + coszen) * 0.001 + 0.0455)
+        # cloud factor (atmospheric transmission)
         cfac = (1 - 0.62 * self.station_settings["clouds"] / 8 + 0.0019 * (np.pi/2 - zen))
-        return 0.43 * Iclear * cfac * (1 - 0.04)
+        # noon irradiance considering PAR fraction and cloud factor
+        Inoon_par = Iclear * cfac * (1 - albedo) * parrac
+        
+        return Inoon_par
 
     def light_limitation(self, Iin, Iout, kPAR, alpha, Vp, daylength):
         Iavg = (Iin + Iout) / 2
