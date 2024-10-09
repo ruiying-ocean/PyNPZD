@@ -32,7 +32,7 @@ nyears = 3 # run duration, years (1 year= 365 days)
 flag_stn = 2 # station; 1=India (60N 20W), 2=Biotrans (47N 20W), 3=Kerfix (50 40’S 68 25’E), 4=Papa (50N, 145W)
 
 ## lowercase in toml
-flag_seasonality = false
+flag_seasonality = true
 
 ## light limitation
 flag_LI = 1 # 1=numeric; 2=Evans & Parslow (1985); 3=Anderson (1993)
@@ -41,9 +41,9 @@ flag_PIcurve = 1 # 1=Smith fn; 2=exponential fn
 
 flag_irrad = 2 # 1=triangular over day; 2=sinusoidal over day
 flag_grazing = 1 # (1) phihat_i = phi_i, (2) phihat_i = phi_i*P_i
-flag_Tdep = false ## temperature dependency for zooplankton growth and remineralisation
+flag_Tdep = true ## temperature dependency for zooplankton growth and remineralisation
 
-flag_force= true
+flag_force= false
 force_sst = 15
 force_mld = 100
 force_irradiance = 150
