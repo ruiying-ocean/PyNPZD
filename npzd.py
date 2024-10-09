@@ -120,7 +120,7 @@ class NPZDModel:
         day_number = (current_step // n_pday) % n_day + 1
         step_in_day = current_step % n_pday
 
-        return day_number, step_in_day    
+        return day_number, step_in_day
 
     def npzd_ode(self, X, t):
         P, N, Z, D = X
@@ -140,10 +140,18 @@ class NPZDModel:
 
         ## deep-water nitrate concentration
         N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"])
-        
-        VpT = self.params["Vp0"] * self.temp_limitation(self.SST[day_in_year])
+
+        SSTnow = self.SST[day_in_year]
         
         noonparnow = self.noon_par(day_in_year)
+
+        if self.settings["flag_force"]:
+            SSTnow = self.settings['force_sst']
+            MLDnow = self.settings['force_mld']
+            noonparnow = self.settings['force_irradiance']
+            N0 = self.settings['force_N0']
+        
+        VpT = self.params["Vp0"] * self.temp_limitation(SSTnow)            
         
         daylnow = self.day_length(day_in_year)
 
@@ -220,8 +228,6 @@ class NPZDModel:
                                 
         L_I_avg = L_Isum/MLDnow                   # weighted average for mixed layer
 
-
-
         L_N = self.nutrient_limitation(N, self.params["kN"])
 
         if self.settings["flag_grazing"] == 1:
@@ -241,7 +247,7 @@ class NPZDModel:
         Pmix = self.params["wmix"] * P / MLDnow
         Zmix = self.params["wmix"] * Z / MLDnow
         Nmix = self.params["wmix"] * (N0 - N) / MLDnow
-        Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz)
+        Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz) * self.temp_limitation2(SSTnow)
         Zexc = self.params["betaz"] * (1.0 - self.params["kNz"]) * (Pgraz + Dgraz)
         Zpel = (1.0 - self.params["betaz"]) * (Pgraz + Dgraz)
         Zmort = self.params["mz"] * Z
@@ -276,7 +282,7 @@ class NPZDModel:
 
         return [dPdt, dNdt, dZdt, dDdt]
 
-    def run_simulation(self):
+    def run(self):
         ndays = int(self.settings["nyears"] * 365)
         nhr_pday = int(24/self.settings["delta_t"])
         t = np.linspace(0, ndays, ndays * nhr_pday)
@@ -308,8 +314,8 @@ class NPZDModel:
 
 # Usage
 def main():
-    model = NPZDModel("npzd_config.toml")
-    t, solution = model.run_simulation()
+    model = NPZDModel("config.toml")
+    t, solution = model.run()
     ## cut the first year
     t = t[365:]
     solution = solution[365:]    
