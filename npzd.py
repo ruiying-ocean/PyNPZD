@@ -4,32 +4,9 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import tomli
 
-# from photosynthesis import *
+from photosynthesis import calc_aphy, calc_li_num, calc_li_ep85, calc_li_A93
 
-def calc_li_ep85(zdepth, Iin, Iout, kPARlay, alpha, Vp, daylnow):
-    """
-    L_I: Evans & Parslow (1985) function for calculating daily photosynthesis
-    Light extinction using Beer's Law and assumed triangular irradiance during day_in_year
-    """
-    tau1 = daylnow / 2.0 / 24.0
-    betaEP = Vp * tau1 / (alpha * Iin)
-    betaEP2 = Vp * tau1 / (alpha * Iout)
-    
-    sqrt_betaEP2_tau1 = np.sqrt(betaEP2**2 + tau1**2)
-    sqrt_betaEP_tau1 = np.sqrt(betaEP**2 + tau1**2)
-    
-    Lim_I = 2.0 * Vp / (zdepth * kPARlay) * (
-        sqrt_betaEP2_tau1
-        - tau1 * np.log((tau1 + sqrt_betaEP2_tau1) / betaEP2)
-        - (sqrt_betaEP_tau1 - tau1 * np.log((tau1 + sqrt_betaEP_tau1) / betaEP))
-        - betaEP2
-        + betaEP
-    )
-    
-    # Divide by Vp to make dimensionless
-    Lim_I /= Vp
-    
-    return Lim_I
+
 
 class NPZDModel:
     def __init__(self, config_file):
@@ -207,19 +184,22 @@ class NPZDModel:
         ## calculate photosynthesis
         L_Isum = 0.0
         for ilay in range(1,jnlay+1):
-            match self.settings["flag_PIcurve"]:
+            match self.settings["flag_LI"]:
                 case 1:
-                    pass
+                      L_I = calc_li_num(zdep[ilay], Ibase[ilay-1], Ibase[ilay], kPAR[ilay],
+                                        self.params["alpha"],VpT,daylnow,
+                                        self.settings["flag_irrad"],
+                                        self.settings["flag_PIcurve"])
                 case 2:
                     L_I = calc_li_ep85(zdep[ilay], Ibase[ilay-1], Ibase[ilay], kPAR[ilay], self.params["alpha"], VpT, daylnow)
-
-                    L_Isum += L_I*zdep[ilay]
-
-
-                case 3:                    
-                    pass
-            
-                
+                case 3:
+                    aphybase[0] = 0.36796 + 0.17537*ss - 0.065276*ss**2 + 0.013528*ss**3 - 0.0011108*ss**4
+                    ahash = calc_aphy(ss, zbase[ilay-1],zbase[ilay], aphybase[ilay-1])
+                    aphybase[ilay] = aphybase[ilay-1]+ahash
+                    aphyav = aphybase[ilay-1]+ahash*0.5
+                    L_I = calc_li_A93(zdep[ilay],Ibase[ilay-1],Ibase[ilay],kPAR[ilay],self.params['alpha'],VpT,daylnow,aphyav)
+                    
+            L_Isum += L_I * zdep[ilay]         
                                 
         L_I_avg = L_Isum/MLDnow                   # weighted average for mixed layer
 
