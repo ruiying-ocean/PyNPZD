@@ -278,8 +278,17 @@ class NPZDModel:
         t = np.linspace(0, ndays, ndays * nhr_pday)
         X0 = [self.settings["Pinit"], self.settings["Ninit"], 
               self.settings["Zinit"], self.settings["Dsinit"]]
+
+
+        print("*************************************")
+        print("         Model running")
+        print("*************************************")
         
         solution = odeint(self.npzd_ode, X0, t)
+
+        print("*************************************")
+        print("         Model completed")
+        print("*************************************")        
         return t, solution
 
     def plot_results(self, t, solution):
