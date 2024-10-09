@@ -63,8 +63,11 @@ class NPZDModel:
 
     def day_length(self, day_in_year):
         """calculate day_in_year length in hours"""
-        declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180
-        daylnow =  24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
+        if self.settings["flag_seasonality"]:
+            declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180
+            daylnow =  24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
+        else:
+            daylnow = 12
         return daylnow
 
 
