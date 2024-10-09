@@ -263,6 +263,10 @@ class NPZDModel:
             Pdilute = 0.0
             Zdilute = 0.0
             Ddilute = 0.0
+
+        if not self.settings["flag_seasonality"]:
+            Nmix = self.params["wmix"] * (N0 - N)
+            
                
 
         dPdt = Pgrow - Pgraz - Pmort - Pmort2 - Pmix - Pdilute
