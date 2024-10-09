@@ -41,6 +41,7 @@ flag_PIcurve = 1 # 1=Smith fn; 2=exponential fn
 
 flag_irrad = 2 # 1=triangular over day; 2=sinusoidal over day
 flag_grazing = 1 # (1) phihat_i = phi_i, (2) phihat_i = phi_i*P_i
+flag_Tdep = false ## temperature dependency for zooplankton growth and remineralisation
 
 flag_force= true
 force_sst = 15

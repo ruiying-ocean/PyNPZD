@@ -112,6 +112,12 @@ class NPZDModel:
     def temp_limitation(self, T):
         return 1.066**T
 
+    def temp_limitation2(self, T):
+        ref_t = 20
+        a = 0.05
+        return np.exp(a * (T - ref_t))
+
+
     def get_deep_water_nitrate(self, depth, aN, bN):
         return aN * depth + bN        
 
@@ -247,14 +253,23 @@ class NPZDModel:
         Pmix = self.params["wmix"] * P / MLDnow
         Zmix = self.params["wmix"] * Z / MLDnow
         Nmix = self.params["wmix"] * (N0 - N) / MLDnow
-        Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz) * self.temp_limitation2(SSTnow)
+
+        if self.settings["flag_Tdep"]:
+            Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz) * self.temp_limitation2(SSTnow)
+            Dremin = self.params["mD"] * D * self.temp_limitation2(SSTnow)
+        else:
+            Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz)
+            Dremin = self.params["mD"] * D
+
+               
+        
         Zexc = self.params["betaz"] * (1.0 - self.params["kNz"]) * (Pgraz + Dgraz)
         Zpel = (1.0 - self.params["betaz"]) * (Pgraz + Dgraz)
         Zmort = self.params["mz"] * Z
         Zmort2 = self.params["mz2"] * Z**2
         Dmix = self.params["wmix"] * D / MLDnow
         Dsink = self.params["VD"] * D / MLDnow
-        Dremin = self.params["mD"] * D
+        
 
         diffMLD = MLD2 - MLD1
         if (diffMLD > 0.0):
