@@ -138,8 +138,9 @@ class NPZDModel:
         day_in_year = int(t) % 365
         hour_in_day = ihour % 24
         
-        MLD1 = self.MLD[day_in_year]
+        MLD1 = self.MLD[day_in_year]        
         MLD2 = self.MLD[day_in_year + 1]
+
         ## calculate current MLD according to the time of the day
         MLDnow = MLD1 + (MLD2 - MLD1) * hour_in_day / 24
 
@@ -166,6 +167,8 @@ class NPZDModel:
                 kPAR[1] = self.params['kw'] + self.params['kc']*P
                 Ibase[0] = noonparnow
                 Ibase[1] = Ibase[0] * np.exp(-kPAR[1] * MLDnow)
+
+                
             case 2:
                 jnlay = 2
                 Ibase[0] = noonparnow
@@ -203,20 +206,24 @@ class NPZDModel:
 
         ## calculate photosynthesis
         L_Isum = 0.0
-        for ilay in range(jnlay):
-
+        for ilay in range(1,jnlay+1):
             match self.settings["flag_PIcurve"]:
                 case 1:
                     pass
                 case 2:
-                    L_I = calc_li_ep85(zdep[ilay], Ibase[ilay], Ibase[ilay-1], kPAR[ilay], self.params["alpha"], VpT, daylnow)
-                    L_Isum += L_I*zdep[ilay]        
+                    L_I = calc_li_ep85(zdep[ilay], Ibase[ilay-1], Ibase[ilay], kPAR[ilay], self.params["alpha"], VpT, daylnow)
+
+                    L_Isum += L_I*zdep[ilay]
+
+
                 case 3:                    
                     pass
             
                 
                                 
-        L_I = L_Isum/MLDnow                   # weighted average for mixed layer
+        L_I_avg = L_Isum/MLDnow                   # weighted average for mixed layer
+
+
 
         L_N = self.nutrient_limitation(N, self.params["kN"])
 
@@ -228,7 +235,8 @@ class NPZDModel:
         intakespP = self.params["Imax"] * phiPhat * P / (self.params["kz"]**2 + phiPhat * P + phiDhat * D)
         intakespD = self.params["Imax"] * phiDhat * D / (self.params["kz"]**2 + phiPhat * P + phiDhat * D)
 
-        Pgrow = VpT*L_I*L_N* 24/self.params['CtoChl']*P
+        Pgrow = VpT*L_I_avg*L_N* 24/self.params['CtoChl']*P
+
         Pgraz = intakespP * Z
         Dgraz = intakespD * Z
         Pmort = self.params["mP"] * P
