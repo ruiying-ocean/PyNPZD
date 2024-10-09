@@ -39,8 +39,16 @@ class NPZDModel:
         self.latitude = np.radians(self.station_settings["lat"])
 
     def interpolate_forcing_data(self):
-        self.MLD = self.interpolate_yearly_data(self.station_settings["MLD"])
-        self.SST = self.interpolate_yearly_data(self.station_settings["SST"])
+        if self.settings["flag_seasonality"]:
+            self.MLD = self.interpolate_yearly_data(self.station_settings["MLD"])
+            self.SST = self.interpolate_yearly_data(self.station_settings["SST"])
+        else:
+            ann_mean_MLD = np.mean(self.station_settings["MLD"])
+            ann_mean_SST = np.mean(self.station_settings["SST"])
+
+            self.MLD = np.full(366, ann_mean_MLD)
+            self.SST = np.full(366, ann_mean_SST)
+            
 
     @staticmethod
     def interpolate_yearly_data(monthly_data):
@@ -55,8 +63,11 @@ class NPZDModel:
 
     def day_length(self, day_in_year):
         """calculate day_in_year length in hours"""
-        declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180
-        daylnow =  24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
+        if self.settings["flag_seasonality"]:
+            declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180
+            daylnow =  24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
+        else:
+            daylnow = 12
         return daylnow
 
 
@@ -65,23 +76,29 @@ class NPZDModel:
         albedo = self.params["albedo"]
         solarconst = self.params["solarconst"] # solar constant
         parrac = self.params["parrac"] # fraction of PAR in solar radiation
-        e0 = self.station_settings["e0"] # water vapour pressure (e0; the partialpressure of water vapour in the atmosphere). 
+        e0 = self.station_settings["e0"] # water vapour pressure (e0; the partialpressure of water vapour in the atmosphere).
+            
+        if self.settings["flag_seasonality"]:
+            # Earth's radius vector
+            Rvector = 1 / np.sqrt(1 + 0.033 * np.cos(2 * np.pi * day_in_year * 0.00274))
+            # solar declination angle
+            declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180        
+            # cosine of zenith angle
+            coszen = np.sin(self.latitude) * np.sin(declin) + np.cos(self.latitude) * np.cos(declin)    
+            zen = np.arccos(coszen)            
+        else:
+            # Use constant values for Rvector, declin, and coszen
+            Rvector = 1.0  # Assume average distance from Sun
+            declin = 0.0  # Assume no declination
+            coszen = np.cos(self.latitude)  # Assume Sun is directly overhead at equator
+            zen = np.arccos(coszen)
 
-        # Earth's radius vector
-        Rvector = 1 / np.sqrt(1 + 0.033 * np.cos(2 * np.pi * day_in_year * 0.00274))
-
-        # solar declination angle
-        declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180        
-        
-        # cosine of zenith angle
-        coszen = np.sin(self.latitude) * np.sin(declin) + np.cos(self.latitude) * np.cos(declin)    
-        zen = np.arccos(coszen)
-        
-        # cloud factor (atmospheric transmission)
-        cfac = (1 - 0.62 * self.station_settings["clouds"] / 8 + 0.0019 * (np.pi/2 - zen))        
-
+            
         # irradiance at ocean surface, clear sky
-        Iclear = solarconst * coszen**2 / (Rvector**2) / (1.2 * coszen + e0 * (1.0 + coszen) * 0.001 + 0.0455)        
+        Iclear = solarconst * coszen**2 / (Rvector**2) / (1.2 * coszen + e0 * (1.0 + coszen) * 0.001 + 0.0455)                
+            
+        # cloud factor (atmospheric transmission)
+        cfac = (1 - 0.62 * self.station_settings["clouds"] / 8 + 0.0019 * (np.pi/2 - zen))
         
         # noon irradiance considering PAR fraction and cloud factor
         Inoon_par = Iclear * cfac * (1 - albedo) * parrac
