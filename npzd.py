@@ -78,6 +78,12 @@ class NPZDModel:
         SSTnow = self.SST[day_in_year]
         
         noonparnow = noon_par(day_in_year, self.lat_radian, self.station_settings["clouds"], self.station_settings["e0"])
+
+        if self.settings["flag_force"]:
+            MLDnow = self.settings['force_MLD']
+            N0 = self.settings['force_N0']
+            SSTnow = self.settings['force_SST']
+            noonparnow = self.settings['force_irradiance']        
         
         VpT = self.params["Vp0"] * self.temp_limitation(SSTnow)            
         
