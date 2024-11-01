@@ -96,29 +96,111 @@ def calc_li_A93(zdepth, Iin, Iout, kPARlay, alpha, Vp, daylnow, ahashnow):
     
     return Lim_I
 
+
 def calc_aphy(ss, ztop, zbottom, aphylast):
-    g = np.array([0.048014, 0.00023779, -0.023074, 0.0031095, -0.0090545, 
-                  0.0027974, 0.00085217, -3.9804E-06, 0.0012398, -0.00061991])
 
-    x_bottom = zbottom + 1.0
-    xlg_bottom = np.log(x_bottom)
-    termf1a = x_bottom * xlg_bottom - x_bottom
-    termf2a = x_bottom * xlg_bottom**2 - 2 * x_bottom * xlg_bottom + 2 * x_bottom
-    termf3a = x_bottom * xlg_bottom**3 - 3 * x_bottom * xlg_bottom**2 + 6 * x_bottom * xlg_bottom - 6 * x_bottom
-
-    x_top = ztop + 1.0
-    xlg_top = np.log(x_top)
-    termf1b = x_top * xlg_top - x_top
-    termf2b = x_top * xlg_top**2 - 2 * x_top * xlg_top + 2 * x_top
-    termf3b = x_top * xlg_top**3 - 3 * x_top * xlg_top**2 + 6 * x_top * xlg_top - 6 * x_top
-
-    terma = g[0] + g[1] * ss + g[4] * ss**2 + g[6] * ss**3
-    termb = g[2] + g[3] * ss + g[8] * ss**2
-    termc = g[5] + g[9] * ss
-
-    acalc = (zbottom + 1.0) * terma + termf1a * termb + \
-            termf2a * termc + termf3a * g[7] - \
-            ((ztop + 1.0) * terma + termf1b * termb + \
-            termf2b * termc + termf3b * g[7])
-
+    # coefficients for calculating a
+    g = np.array([
+        0.048014, 0.00023779, -0.023074, 0.0031095, -0.0090545,
+        0.0027974, 0.00085217, -3.9804E-06, 0.0012398, -0.00061991
+    ])
+    
+    # Calculate terms for bottom depth
+    x = zbottom + 1.0
+    xlg = np.log(x)
+    termf1a = x * xlg - x
+    termf2a = x * xlg**2 - 2 * x * xlg + 2 * x
+    termf3a = x * xlg**3 - 3 * x * xlg**2 + 6 * x * xlg - 6 * x
+    
+    # Calculate terms for top depth
+    x = ztop + 1.0
+    xlg = np.log(x)
+    termf1b = x * xlg - x
+    termf2b = x * xlg**2 - 2 * x * xlg + 2 * x
+    termf3b = x * xlg**3 - 3 * x * xlg**2 + 6 * x * xlg - 6 * x
+    
+    # Calculate composite terms
+    terma = g[0] + g[1]*ss + g[4]*ss**2 + g[6]*ss**3
+    termb = g[2] + g[3]*ss + g[8]*ss**2
+    termc = g[5] + g[9]*ss
+    
+    # Calculate final result
+    acalc = ((zbottom + 1.0) * terma + 
+             termf1a * termb + 
+             termf2a * termc + 
+             termf3a * g[7] - 
+             ((ztop + 1.0) * terma + 
+              termf1b * termb + 
+              termf2b * termc + 
+              termf3b * g[7]))
+    
     return acalc
+
+def day_length(day_in_year, lat_radian):
+    """calculate day_in_year length in hours"""
+    declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180
+    daylnow =  24 * np.arccos(-np.tan(lat_radian) * np.tan(declin)) / np.pi
+        
+    return daylnow
+
+def noon_par(jday, latradians, clouds, e0):
+    # Constants
+    albedo = 0.04          # albedo
+    solarconst = 1368.0    # solar constant, w m-2
+    parrac = 0.43          # PAR fraction
+    
+    # Calculate solar declination angle
+    declin = 23.45 * np.sin(2 * np.pi * (284 + jday) * 0.00274) * np.pi / 180
+    
+    # Calculate cosine of zenith angle
+    coszen = np.sin(latradians) * np.sin(declin) + \
+             np.cos(latradians) * np.cos(declin)
+    
+    # Calculate zenith angle in degrees
+    zen = np.arccos(coszen) * 180 / np.pi
+    
+    # Calculate Earth's radius vector
+    Rvector = 1 / np.sqrt(1 + 0.033 * np.cos(2 * np.pi * jday * 0.00274))
+    
+    # Calculate irradiance at ocean surface, clear sky
+    Iclear = (solarconst * coszen**2) / \
+             (Rvector**2) / \
+             (1.2 * coszen + e0 * (1.0 + coszen) * 0.001 + 0.0455)
+    
+    # Calculate cloud factor (atmospheric transmission)
+    cfac = (1 - 0.62 * clouds * 0.125 + 0.0019 * (90 - zen))
+    
+    # Calculate noon irradiance: total solar
+    Inoon = Iclear * cfac * (1 - albedo)
+    
+    # Calculate final noon PAR
+    noonparnow = parrac * Inoon
+    
+    return noonparnow
+
+
+def interpolate_monthly_to_daily(monthly_data):
+    daily_data = np.zeros(366)
+    
+    for istep in range(1,366):
+        rdiv = 365.0/12.0
+        quot = istep // rdiv
+        remdr = (istep % rdiv) / rdiv
+        
+        n1 = int(quot + 1)
+        if n1 == 13:
+            n1 = 1
+        n2 = n1 + 1
+        
+        iday = istep + 15
+        if iday > 365:
+            iday = iday - 365
+            
+        daily_data[iday-1] = monthly_data[n1-1] + (monthly_data[n2-1] - monthly_data[n1-1]) * remdr
+    
+    ## shift by one place
+    daily_data =np.roll(daily_data, 1)
+
+    daily_data[0] = daily_data[-1]
+    
+    return daily_data

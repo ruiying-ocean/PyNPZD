@@ -4,9 +4,7 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import tomli
 
-from photosynthesis import calc_aphy, calc_li_num, calc_li_ep85, calc_li_A93
-
-
+from npzd_funcs import *
 
 class NPZDModel:
     def __init__(self, config_file):
@@ -36,87 +34,17 @@ class NPZDModel:
             4: {"lat": 50.0, "clouds": 6.0, "e0": 12.0, "aN": 0.0, "bN": 14.6, "MLD": forcing.iloc[:13, 4], "SST": forcing.iloc[:13, 5]}
         }
         self.station_settings = station_settings[station]
-        self.latitude = np.radians(self.station_settings["lat"])
+        self.lat_radian = self.station_settings["lat"]*np.pi/180
 
     def interpolate_forcing_data(self):
-        if self.settings["flag_seasonality"]:
-            self.MLD = self.interpolate_yearly_data(self.station_settings["MLD"])
-            self.SST = self.interpolate_yearly_data(self.station_settings["SST"])
-        else:
-            ann_mean_MLD = np.mean(self.station_settings["MLD"])
-            ann_mean_SST = np.mean(self.station_settings["SST"])
-
-            self.MLD = np.full(366, ann_mean_MLD)
-            self.SST = np.full(366, ann_mean_SST)
-            
-
-    @staticmethod
-    def interpolate_yearly_data(monthly_data):
-        daily_data = np.zeros(366)
-        for i in range(365):
-            month = i // 30
-            next_month = (month + 1) % 12
-            frac = (i % 30) / 30
-            daily_data[i] = monthly_data[month] * (1 - frac) + monthly_data[next_month] * frac
-        daily_data[365] = daily_data[0]
-        return daily_data
-
-    def day_length(self, day_in_year):
-        """calculate day_in_year length in hours"""
-        if self.settings["flag_seasonality"]:
-            declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180
-            daylnow =  24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
-        else:
-            daylnow = 12
-        return daylnow
-
-
-    def noon_par(self, day_in_year):
-        """Calculation of noon irradiance, Appendix A in the paper"""
-        albedo = self.params["albedo"]
-        solarconst = self.params["solarconst"] # solar constant
-        parrac = self.params["parrac"] # fraction of PAR in solar radiation
-        e0 = self.station_settings["e0"] # water vapour pressure (e0; the partialpressure of water vapour in the atmosphere).
-            
-        if self.settings["flag_seasonality"]:
-            # Earth's radius vector
-            Rvector = 1 / np.sqrt(1 + 0.033 * np.cos(2 * np.pi * day_in_year * 0.00274))
-            # solar declination angle
-            declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180        
-            # cosine of zenith angle
-            coszen = np.sin(self.latitude) * np.sin(declin) + np.cos(self.latitude) * np.cos(declin)    
-            zen = np.arccos(coszen)            
-        else:
-            # Use constant values for Rvector, declin, and coszen
-            Rvector = 1.0  # Assume average distance from Sun
-            declin = 0.0  # Assume no declination
-            coszen = np.cos(self.latitude)  # Assume Sun is directly overhead at equator
-            zen = np.arccos(coszen)
-
-            
-        # irradiance at ocean surface, clear sky
-        Iclear = solarconst * coszen**2 / (Rvector**2) / (1.2 * coszen + e0 * (1.0 + coszen) * 0.001 + 0.0455)                
-            
-        # cloud factor (atmospheric transmission)
-        cfac = (1 - 0.62 * self.station_settings["clouds"] / 8 + 0.0019 * (np.pi/2 - zen))
-        
-        # noon irradiance considering PAR fraction and cloud factor
-        Inoon_par = Iclear * cfac * (1 - albedo) * parrac
-        
-        return Inoon_par
-    
+        self.MLD = interpolate_monthly_to_daily(self.station_settings["MLD"])
+        self.SST = interpolate_monthly_to_daily(self.station_settings["SST"])
     
     def nutrient_limitation(self, N, kN):
         return N / (kN + N)
 
     def temp_limitation(self, T):
         return 1.066**T
-
-    def temp_limitation2(self, T):
-        ref_t = 20
-        a = 0.05
-        return np.exp(a * (T - ref_t))
-
 
     def get_deep_water_nitrate(self, depth, aN, bN):
         return aN * depth + bN        
@@ -128,7 +56,7 @@ class NPZDModel:
 
         return day_number, step_in_day
 
-    def npzd_ode(self, X, t):
+    def ode(self, X, t):
         P, N, Z, D = X
 
         # Calculate day and hour based on t
@@ -149,17 +77,11 @@ class NPZDModel:
 
         SSTnow = self.SST[day_in_year]
         
-        noonparnow = self.noon_par(day_in_year)
-
-        if self.settings["flag_force"]:
-            SSTnow = self.settings['force_sst']
-            MLDnow = self.settings['force_mld']
-            noonparnow = self.settings['force_irradiance']
-            N0 = self.settings['force_N0']
+        noonparnow = noon_par(day_in_year, self.lat_radian, self.station_settings["clouds"], self.station_settings["e0"])
         
         VpT = self.params["Vp0"] * self.temp_limitation(SSTnow)            
         
-        daylnow = self.day_length(day_in_year)
+        daylnow = day_length(day_in_year, self.lat_radian)
 
         kPAR, zbase, Ibase, zdep, aphybase = [np.zeros(4) for _ in range(5)]
         chl = P * 6.625 * 12.0 / self.params["CtoChl"] ## used for light attenuation
@@ -190,7 +112,7 @@ class NPZDModel:
                     jnlay = 1
                     zbase[1] = MLDnow
                     zdep[1] = MLDnow
-                    Ibase[1] = Ibase[0] * np.exp(-kPAR[1] * MLDnow)
+                    Ibase[1] = Ibase[0] * np.exp(-kPAR[1] * zdep[1])
                 elif MLDnow <= 23 and MLDnow > 5:
                     jnlay = 2
                     zbase[1] = 5.0
@@ -206,7 +128,7 @@ class NPZDModel:
                     Ibase[1] = Ibase[0] * np.exp(-kPAR[1] * 5.0)
                     zbase[2] = 23.0
                     zdep[2] = 18.0
-                    Ibase[2] = Ibase[1] * np.exp(-kPAR[2] * 18.0)
+                    Ibase[2] = Ibase[1] * np.exp(-kPAR[2] * zdep[2])
                     zbase[3] = MLDnow
                     zdep[3] = MLDnow - 23.0
                     Ibase[3] = Ibase[2] * np.exp(-kPAR[3] * zdep[3])
@@ -254,13 +176,9 @@ class NPZDModel:
         Zmix = self.params["wmix"] * Z / MLDnow
         Nmix = self.params["wmix"] * (N0 - N) / MLDnow
 
-        if self.settings["flag_Tdep"]:
-            Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz) * self.temp_limitation2(SSTnow)
-            Dremin = self.params["mD"] * D * self.temp_limitation2(SSTnow)
-        else:
-            Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz)
-            Dremin = self.params["mD"] * D
 
+        Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz)
+        Dremin = self.params["mD"] * D
                
         
         Zexc = self.params["betaz"] * (1.0 - self.params["kNz"]) * (Pgraz + Dgraz)
@@ -283,11 +201,7 @@ class NPZDModel:
             Ndilute = 0.0
             Pdilute = 0.0
             Zdilute = 0.0
-            Ddilute = 0.0
-
-        if not self.settings["flag_seasonality"]:
-            Nmix = self.params["wmix"] * (N0 - N)
-            
+            Ddilute = 0.0                
                
 
         dPdt = Pgrow - Pgraz - Pmort - Pmort2 - Pmix - Pdilute
@@ -309,7 +223,7 @@ class NPZDModel:
         print("         Model running")
         print("*************************************")
         
-        solution = odeint(self.npzd_ode, X0, t)
+        solution = odeint(self.ode, X0, t)
 
         print("*************************************")
         print("         Model completed")
