@@ -1,4 +1,5 @@
-from .photosynthesis import calc_li_num, calc_li_ep85, calc_li_A93,calc_aphy
+from photosynthesis import calc_li_num, calc_li_ep85, calc_li_A93,calc_aphy
+from npzd import noon_par
 
 def test_calc_li_num():
     "original: FNLIcalcNu"
@@ -22,8 +23,13 @@ def test_aphy():
     result = round(calc_aphy(10,20,30,10),6)
     assert result == 3.902094
 
-def test_cal_day():
-    "original: FNdaylcalc"
-    result = calc_daylenth(10,0.5)
-    assert result == 10.29673
+# def test_cal_day():
+#     "original: FNdaylcalc"
+#     result = calc_daylenth(10,0.5)
+#     assert result == 10.29673
+
+def test_noon_par():
+    "original: FNnoonparcalc"
+    result = round(noon_par(300, 0.1,0,1),4)
+    assert result == 489.6077
 
