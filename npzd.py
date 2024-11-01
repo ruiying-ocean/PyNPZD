@@ -69,25 +69,26 @@ class NPZDModel:
         MLD1 = self.MLD[day_in_year]        
         MLD2 = self.MLD[day_in_year + 1]
 
-        ## calculate current MLD according to the time of the day
-        MLDnow = MLD1 + (MLD2 - MLD1) * hour_in_day / 24
-
-        ## deep-water nitrate concentration
-        N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"])
-
-        SSTnow = self.SST[day_in_year]
-        
-        noonparnow = noon_par(day_in_year, self.lat_radian, self.station_settings["clouds"], self.station_settings["e0"])
-
         if self.settings["flag_force"]:
             MLDnow = self.settings['force_MLD']
             N0 = self.settings['force_N0']
             SSTnow = self.settings['force_SST']
-            noonparnow = self.settings['force_irradiance']        
+            noonparnow = self.settings['force_irradiance']
+        else:            
+            MLDnow = MLD1 + (MLD2 - MLD1) * hour_in_day / 24
+            N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"])
+            SSTnow = self.SST[day_in_year]        
+            noonparnow = noon_par(day_in_year, self.lat_radian, self.station_settings["clouds"], self.station_settings["e0"])            
         
         VpT = self.params["Vp0"] * self.temp_limitation(SSTnow)            
-        
-        daylnow = day_length(day_in_year, self.lat_radian)
+                
+
+        if self.settings["flag_force"]:
+            daylnow = 12
+        else:
+            daylnow = day_length(day_in_year, self.lat_radian)
+            
+
 
         kPAR, zbase, Ibase, zdep, aphybase = [np.zeros(4) for _ in range(5)]
         chl = P * 6.625 * 12.0 / self.params["CtoChl"] ## used for light attenuation
