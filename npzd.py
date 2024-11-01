@@ -39,15 +39,8 @@ class NPZDModel:
         self.latitude = np.radians(self.station_settings["lat"])
 
     def interpolate_forcing_data(self):
-        if self.settings["flag_seasonality"]:
-            self.MLD = self.interpolate_yearly_data(self.station_settings["MLD"])
-            self.SST = self.interpolate_yearly_data(self.station_settings["SST"])
-        else:
-            ann_mean_MLD = np.mean(self.station_settings["MLD"])
-            ann_mean_SST = np.mean(self.station_settings["SST"])
-
-            self.MLD = np.full(366, ann_mean_MLD)
-            self.SST = np.full(366, ann_mean_SST)
+        self.MLD = self.interpolate_yearly_data(self.station_settings["MLD"])
+        self.SST = self.interpolate_yearly_data(self.station_settings["SST"])
             
 
     @staticmethod
@@ -63,11 +56,9 @@ class NPZDModel:
 
     def day_length(self, day_in_year):
         """calculate day_in_year length in hours"""
-        if self.settings["flag_seasonality"]:
-            declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180
-            daylnow =  24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
-        else:
-            daylnow = 12
+        declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180
+        daylnow =  24 * np.arccos(-np.tan(self.latitude) * np.tan(declin)) / np.pi
+        
         return daylnow
 
 
@@ -78,20 +69,14 @@ class NPZDModel:
         parrac = self.params["parrac"] # fraction of PAR in solar radiation
         e0 = self.station_settings["e0"] # water vapour pressure (e0; the partialpressure of water vapour in the atmosphere).
             
-        if self.settings["flag_seasonality"]:
-            # Earth's radius vector
-            Rvector = 1 / np.sqrt(1 + 0.033 * np.cos(2 * np.pi * day_in_year * 0.00274))
-            # solar declination angle
-            declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180        
-            # cosine of zenith angle
-            coszen = np.sin(self.latitude) * np.sin(declin) + np.cos(self.latitude) * np.cos(declin)    
-            zen = np.arccos(coszen)            
-        else:
-            # Use constant values for Rvector, declin, and coszen
-            Rvector = 1.0  # Assume average distance from Sun
-            declin = 0.0  # Assume no declination
-            coszen = np.cos(self.latitude)  # Assume Sun is directly overhead at equator
-            zen = np.arccos(coszen)
+
+        # Earth's radius vector
+        Rvector = 1 / np.sqrt(1 + 0.033 * np.cos(2 * np.pi * day_in_year * 0.00274))
+        # solar declination angle
+        declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180        
+        # cosine of zenith angle
+        coszen = np.sin(self.latitude) * np.sin(declin) + np.cos(self.latitude) * np.cos(declin)    
+        zen = np.arccos(coszen)            
 
             
         # irradiance at ocean surface, clear sky
@@ -150,12 +135,6 @@ class NPZDModel:
         SSTnow = self.SST[day_in_year]
         
         noonparnow = self.noon_par(day_in_year)
-
-        if self.settings["flag_force"]:
-            SSTnow = self.settings['force_sst']
-            MLDnow = self.settings['force_mld']
-            noonparnow = self.settings['force_irradiance']
-            N0 = self.settings['force_N0']
         
         VpT = self.params["Vp0"] * self.temp_limitation(SSTnow)            
         
@@ -254,13 +233,9 @@ class NPZDModel:
         Zmix = self.params["wmix"] * Z / MLDnow
         Nmix = self.params["wmix"] * (N0 - N) / MLDnow
 
-        if self.settings["flag_Tdep"]:
-            Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz) * self.temp_limitation2(SSTnow)
-            Dremin = self.params["mD"] * D * self.temp_limitation2(SSTnow)
-        else:
-            Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz)
-            Dremin = self.params["mD"] * D
 
+        Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz) * self.temp_limitation2(SSTnow)
+        Dremin = self.params["mD"] * D * self.temp_limitation2(SSTnow)
                
         
         Zexc = self.params["betaz"] * (1.0 - self.params["kNz"]) * (Pgraz + Dgraz)
@@ -285,8 +260,8 @@ class NPZDModel:
             Zdilute = 0.0
             Ddilute = 0.0
 
-        if not self.settings["flag_seasonality"]:
-            Nmix = self.params["wmix"] * (N0 - N)
+        
+        Nmix = self.params["wmix"] * (N0 - N)
             
                
 
