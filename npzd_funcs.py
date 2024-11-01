@@ -122,3 +122,45 @@ def calc_aphy(ss, ztop, zbottom, aphylast):
             termf2b * termc + termf3b * g[7])
 
     return acalc
+
+def day_length(day_in_year, lat_radian):
+    """calculate day_in_year length in hours"""
+    declin = 23.45 * np.sin(2 * np.pi * (284 + day_in_year) * 0.00274) * np.pi / 180
+    daylnow =  24 * np.arccos(-np.tan(lat_radian) * np.tan(declin)) / np.pi
+        
+    return daylnow
+
+def noon_par(jday, latradians, clouds, e0):
+    # Constants
+    albedo = 0.04          # albedo
+    solarconst = 1368.0    # solar constant, w m-2
+    parrac = 0.43          # PAR fraction
+    
+    # Calculate solar declination angle
+    declin = 23.45 * np.sin(2 * np.pi * (284 + jday) * 0.00274) * np.pi / 180
+    
+    # Calculate cosine of zenith angle
+    coszen = np.sin(latradians) * np.sin(declin) + \
+             np.cos(latradians) * np.cos(declin)
+    
+    # Calculate zenith angle in degrees
+    zen = np.arccos(coszen) * 180 / np.pi
+    
+    # Calculate Earth's radius vector
+    Rvector = 1 / np.sqrt(1 + 0.033 * np.cos(2 * np.pi * jday * 0.00274))
+    
+    # Calculate irradiance at ocean surface, clear sky
+    Iclear = (solarconst * coszen**2) / \
+             (Rvector**2) / \
+             (1.2 * coszen + e0 * (1.0 + coszen) * 0.001 + 0.0455)
+    
+    # Calculate cloud factor (atmospheric transmission)
+    cfac = (1 - 0.62 * clouds * 0.125 + 0.0019 * (90 - zen))
+    
+    # Calculate noon irradiance: total solar
+    Inoon = Iclear * cfac * (1 - albedo)
+    
+    # Calculate final noon PAR
+    noonparnow = parrac * Inoon
+    
+    return noonparnow

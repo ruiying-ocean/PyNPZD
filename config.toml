@@ -29,13 +29,11 @@ Zinit = 0.1 # initial Z, mmol N m-3
 Dsinit = 0.1 # initial Ds, mmol N m-3
 delta_t = 1 # time step, hour
 nyears = 3 # run duration, years (1 year= 365 days)
-flag_stn = 2 # station; 1=India (60N 20W), 2=Biotrans (47N 20W), 3=Kerfix (50 40’S 68 25’E), 4=Papa (50N, 145W)
 
-## light limitation
+flag_stn = 2 # station; 1=India (60N 20W), 2=Biotrans (47N 20W), 3=Kerfix (50 40’S 68 25’E), 4=Papa (50N, 145W)
 flag_LI = 1 # 1=numeric; 2=Evans & Parslow (1985); 3=Anderson (1993)
 flag_atten = 2 # 1: kw+kcP (one layer for ML); 2: Anderson (1993) (spectral, layers 0-5, 5-23, >23 m)
-flag_PIcurve = 1 # 1=Smith fn; 2=exponential fn
-
 flag_irrad = 2 # 1=triangular over day; 2=sinusoidal over day
-flag_grazing = 1 # (1) phihat_i = phi_i, (2) phihat_i = phi_i*P_i
+flag_PIcurve = 1 # 1=Smith fn; 2=exponential fn
+flag_grazing = 2 # (1) phihat_i = phi_i, (2) phihat_i = phi_i*P_i
 
