@@ -41,16 +41,7 @@ class NPZDModel:
         self.SST = self.interpolate_yearly_data(self.station_settings["SST"])
             
 
-    @staticmethod
-    def interpolate_yearly_data(monthly_data):
-        daily_data = np.zeros(366)
-        for i in range(365):
-            month = i // 30
-            next_month = (month + 1) % 12
-            frac = (i % 30) / 30
-            daily_data[i] = monthly_data[month] * (1 - frac) + monthly_data[next_month] * frac
-        daily_data[365] = daily_data[0]
-        return daily_data
+
 
 
     

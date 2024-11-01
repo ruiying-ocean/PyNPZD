@@ -1,4 +1,4 @@
-from npzd_funcs import calc_li_num, calc_li_ep85, calc_li_A93,calc_aphy,noon_par, day_length
+from npzd_funcs import *
 
 def test_calc_li_num():
     "original: FNLIcalcNu"
@@ -19,8 +19,8 @@ def test_li_A93():
 
 def test_aphy():
     "original: FNaphy"
-    result = round(calc_aphy(10,20,30,10),6)
-    assert result == 3.902094
+    result = round(calc_aphy(10,10,20,1),6)
+    assert result == 3.348472
 
 def test_noon_par():
     "original: FNnoonparcalc"
@@ -33,3 +33,10 @@ def test_daylength():
     result = round(day_length(10,0.6),6)
     assert result == 9.856603
     
+def test_interp_monthly():
+    "original: FNinterpolate"
+    monthly_mld = np.array([242.4, 510.5, 547.3 ,362.7 , 65.2 , 40.2 , 
+        22.1 , 36.2 , 52.7 , 68.0  ,88.0 ,144.9, 242.4])
+    daily_mld= interpolate_monthly_to_daily(monthly_mld)
+    result = round(daily_mld[0], 8)
+    assert result==194.31780822
