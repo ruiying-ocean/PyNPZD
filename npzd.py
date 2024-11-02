@@ -181,8 +181,12 @@ class NPZDModel:
         Pmort2 = self.params["mP2"] * P * P
         Pmix = self.params["wmix"] * P / MLDnow
         Zmix = self.params["wmix"] * Z / MLDnow
-        Nmix = self.params["wmix"] * (N0 - N) / MLDnow
 
+
+        if self.settings["flag_force"]:
+            Nmix = self.params["wmix"] * (N0 - N) #rapid mixing for chemostat
+        else:
+           Nmix = self.params["wmix"] * (N0 - N) / MLDnow
 
         Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz)
         Dremin = self.params["mD"] * D
