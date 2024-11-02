@@ -59,29 +59,29 @@ class NPZDModel:
     def ode(self, X, t):
         P, N, Z, D = X
 
-        # Calculate day and hour based on t
-        iday = np.floor(t).astype(int) + 1  # 1-indexed days
-        ihour = np.floor((t - iday + 1) * 24).astype(int)  # 0-indexed hours
+        if self.settings["flag_force"]:
+            MLDnow = self.settings['force_MLD']
+            N0 = self.settings['force_N0']
+            SSTnow = self.settings['force_SST']
+            noonparnow = self.settings['force_irradiance']
+            daylnow = 12
+        else:
+            # Calculate day and hour based on t
+            iday = np.floor(t).astype(int) + 1  # 1-indexed days
+            ihour = np.floor((t - iday + 1) * 24).astype(int)  # 0-indexed hours
 
-        day_in_year = int(t) % 365
-        hour_in_day = ihour % 24
-        
-        MLD1 = self.MLD[day_in_year]        
-        MLD2 = self.MLD[day_in_year + 1]
+            day_in_year = int(t) % 365
+            hour_in_day = ihour % 24
 
-        ## calculate current MLD according to the time of the day
-        MLDnow = MLD1 + (MLD2 - MLD1) * hour_in_day / 24
-
-        ## deep-water nitrate concentration
-        N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"])
-
-        SSTnow = self.SST[day_in_year]
+            MLD1 = self.MLD[day_in_year]        
+            MLD2 = self.MLD[day_in_year + 1]            
+            MLDnow = MLD1 + (MLD2 - MLD1) * hour_in_day / 24
+            N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"])
+            SSTnow = self.SST[day_in_year]        
+            noonparnow = noon_par(day_in_year, self.lat_radian, self.station_settings["clouds"], self.station_settings["e0"])
+            daylnow = day_length(day_in_year, self.lat_radian)
         
-        noonparnow = noon_par(day_in_year, self.lat_radian, self.station_settings["clouds"], self.station_settings["e0"])
-        
-        VpT = self.params["Vp0"] * self.temp_limitation(SSTnow)            
-        
-        daylnow = day_length(day_in_year, self.lat_radian)
+        VpT = self.params["Vp0"] * self.temp_limitation(SSTnow)                        
 
         kPAR, zbase, Ibase, zdep, aphybase = [np.zeros(4) for _ in range(5)]
         chl = P * 6.625 * 12.0 / self.params["CtoChl"] ## used for light attenuation
@@ -174,8 +174,12 @@ class NPZDModel:
         Pmort2 = self.params["mP2"] * P * P
         Pmix = self.params["wmix"] * P / MLDnow
         Zmix = self.params["wmix"] * Z / MLDnow
-        Nmix = self.params["wmix"] * (N0 - N) / MLDnow
 
+
+        if self.settings["flag_force"]:
+            Nmix = self.params["wmix"] * (N0 - N) #rapid mixing for chemostat
+        else:
+           Nmix = self.params["wmix"] * (N0 - N) / MLDnow
 
         Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz)
         Dremin = self.params["mD"] * D
@@ -189,7 +193,11 @@ class NPZDModel:
         Dsink = self.params["VD"] * D / MLDnow
         
 
-        diffMLD = MLD2 - MLD1
+        if self.settings['flag_force']:
+            diffMLD = 0
+        else:
+            diffMLD = MLD2 - MLD1
+            
         if (diffMLD > 0.0):
             Nadd = diffMLD * N0 / MLDnow
             Ndilute = N * diffMLD / MLDnow

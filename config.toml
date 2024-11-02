@@ -37,3 +37,9 @@ flag_irrad = 2 # 1=triangular over day; 2=sinusoidal over day
 flag_PIcurve = 1 # 1=Smith fn; 2=exponential fn
 flag_grazing = 2 # (1) phihat_i = phi_i, (2) phihat_i = phi_i*P_i
 
+flag_force=false
+force_SST=15
+force_MLD=100
+force_N0=5
+force_irradiance=200
+
