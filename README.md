@@ -131,7 +131,6 @@ NPZD/
 ├── stations_forcing.txt # Station forcing data
 ├── tests/               # Test suite
 ├── pyproject.toml       # Package configuration
-└── CLAUDE.md           # Development guidance
 ```
 
 ## Reference
