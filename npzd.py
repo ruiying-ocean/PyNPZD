@@ -4,7 +4,7 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import tomli
 
-from npzd_funcs import *
+from npzd_funcs import day_length, interpolate_monthly_to_daily, noon_par, calc_li_num, calc_li_ep85, calc_li_A93, calc_aphy
 
 class NPZDModel:
     def __init__(self, config_file):
@@ -20,6 +20,7 @@ class NPZDModel:
     def initialize_model(self):
         self.set_station_settings()
         self.interpolate_forcing_data()
+        self.precompute_daily_cycles()
 
     def set_station_settings(self):
         station = self.settings["flag_stn"]
@@ -39,6 +40,18 @@ class NPZDModel:
     def interpolate_forcing_data(self):
         self.MLD = interpolate_monthly_to_daily(self.station_settings["MLD"])
         self.SST = interpolate_monthly_to_daily(self.station_settings["SST"])
+    
+    def precompute_daily_cycles(self):
+        if self.settings["flag_force"]:
+            self.day_length_cycle = None
+            self.noon_par_cycle = None
+            return
+
+        days = np.arange(365)
+        clouds = self.station_settings["clouds"]
+        e0 = self.station_settings["e0"]
+        self.day_length_cycle = day_length(days, self.lat_radian)
+        self.noon_par_cycle = noon_par(days, self.lat_radian, clouds, e0)
     
     def nutrient_limitation(self, N, kN):
         return N / (kN + N)
@@ -66,20 +79,17 @@ class NPZDModel:
             noonparnow = self.settings['force_irradiance']
             daylnow = 12
         else:
-            # Calculate day and hour based on t
-            iday = np.floor(t).astype(int) + 1  # 1-indexed days
-            ihour = np.floor((t - iday + 1) * 24).astype(int)  # 0-indexed hours
-
-            day_in_year = int(t) % 365
-            hour_in_day = ihour % 24
+            day_index = int(t)
+            day_in_year = day_index % 365
+            hour_in_day = int((t - day_index) * 24)
 
             MLD1 = self.MLD[day_in_year]        
             MLD2 = self.MLD[day_in_year + 1]            
             MLDnow = MLD1 + (MLD2 - MLD1) * hour_in_day / 24
             N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"])
             SSTnow = self.SST[day_in_year]        
-            noonparnow = noon_par(day_in_year, self.lat_radian, self.station_settings["clouds"], self.station_settings["e0"])
-            daylnow = day_length(day_in_year, self.lat_radian)
+            noonparnow = self.noon_par_cycle[day_in_year]
+            daylnow = self.day_length_cycle[day_in_year]
         
         VpT = self.params["Vp0"] * self.temp_limitation(SSTnow)                        
 
@@ -222,7 +232,7 @@ class NPZDModel:
     def run(self):
         ndays = int(self.settings["nyears"] * 365)
         nhr_pday = int(24/self.settings["delta_t"])
-        t = np.linspace(0, ndays, ndays * nhr_pday)
+        t = np.linspace(0, ndays, ndays * nhr_pday, endpoint=False)
         X0 = [self.settings["Pinit"], self.settings["Ninit"], 
               self.settings["Zinit"], self.settings["Dsinit"]]
 

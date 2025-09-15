@@ -45,6 +45,10 @@ uv run python npzd.py
 python npzd.py
 ```
 
+> The core light-limitation kernels are JIT-compiled with Numba on first use for
+> faster integrations, so the initial run may take a little longer while the
+> compiled functions are cached.
+
 ### Running Tests
 
 ```bash

@@ -1,7 +1,40 @@
 import numpy as np
 from scipy.special import factorial
 
+try:  # Optional acceleration via Numba when available.
+    from numba import njit
+except ModuleNotFoundError:  # pragma: no cover - fallback for environments without numba
+    def njit(*args, **kwargs):  # type: ignore
+        def decorator(func):
+            return func
 
+        if args and callable(args[0]):
+            return args[0]
+        return decorator
+
+
+# Precomputed constants reused inside the light limitation helpers. Using module
+# level arrays avoids reallocating the same small vectors for every ODE function
+# evaluation, which noticeably reduces the total runtime of the integrator.
+_NUM_TIME_STEPS = 10
+_TRAPEZOID_WEIGHTS = np.ones(_NUM_TIME_STEPS, dtype=np.float64)
+_TRAPEZOID_WEIGHTS[-1] = 0.5
+_TRIANGULAR_IRRADIANCE = np.linspace(1.0, float(_NUM_TIME_STEPS), _NUM_TIME_STEPS, dtype=np.float64) / _NUM_TIME_STEPS
+_SINUSOIDAL_IRRADIANCE = np.sin(np.arange(1.0, _NUM_TIME_STEPS + 1.0, dtype=np.float64) / _NUM_TIME_STEPS * (np.pi / 2.0))
+
+_SERIES_INDICES = np.arange(1, 17, dtype=np.int64)
+_SERIES_COEFFS = ((-1.0) ** (_SERIES_INDICES + 1)) / (_SERIES_INDICES * factorial(_SERIES_INDICES))
+
+_A93_OMEGA = np.array([1.9004, -2.8333E-01, 2.8050E-02, -1.4729E-03, 3.0841E-05], dtype=np.float64)
+_A93_POWERS = np.arange(1, 6, dtype=np.int64)
+
+_APHY_COEFF = np.array([
+    0.048014, 0.00023779, -0.023074, 0.0031095, -0.0090545,
+    0.0027974, 0.00085217, -3.9804E-06, 0.0012398, -0.00061991
+], dtype=np.float64)
+
+
+@njit(cache=True, fastmath=True)
 def calc_li_ep85(zdepth, Iin, Iout, kPARlay, alpha, Vp, daylnow):
     """
     L_I: Evans & Parslow (1985) function for calculating daily photosynthesis
@@ -29,55 +62,43 @@ def calc_li_ep85(zdepth, Iin, Iout, kPARlay, alpha, Vp, daylnow):
     
     return Lim_I
 
+@njit(cache=True, fastmath=True)
 def calc_li_num(zdepth, Iin, Iout, kPARlay, alpha, Vp, daylnow, choiceirrad, choicePI):
-    sumps = 0.0  # for calculating sum of photosynthesis
-    range_rad = np.pi / 2.0
-    nstepst = 10  # the day from sunrise to midday will be divided into nstepst steps (can be altered if so desired)
-    
-    for itme in range(1, nstepst + 1):  # time loop (no need to calculate itme = 0 because irradiance zero at sunrise)
-        rtrapt = 0.5 if itme == nstepst else 1.0  # trapezoidal rule
-        
-        if choiceirrad == 1:  # choice of either (1) triangular or (2) sinusoidal irradiance over day
-            Icorr = itme / nstepst  # irradiance multiplier for time of day: triangular
-        elif choiceirrad == 2:
-            Icorr = np.sin(itme / nstepst * range_rad)  # irradiance multiplier for time of day: sinusoidal
-        
-        if choicePI == 1:  # Smith function (the most straightforward choice in terms of calculating analytic depth integral)
-            x0 = alpha * Icorr * Iin
-            xH = alpha * Icorr * Iin * np.exp(-kPARlay * zdepth)
-            sumpsz = Vp / kPARlay / zdepth * (np.log(x0 + np.sqrt(Vp**2 + x0**2)) - np.log(xH + np.sqrt(Vp**2 + xH**2)))
-        else:  # exponential function (Platt et al., 1990)
-            choiceanalytic = 1  # 1=analytic solution; 2=numeric solution; set manually in the code
-            if choiceanalytic == 1:  # analytic solution
-                istar1 = alpha * Icorr * Iin / Vp
-                istar2 = alpha * Icorr * Iout / Vp
-                # Analytic solution is an infinite series
-                ifact = np.arange(1, 17)
-                sumpsz = np.sum((-1)**(ifact + 1) / (ifact * factorial(ifact)) * (istar1**ifact - istar2**ifact))
-                sumpsz *= Vp / kPARlay / zdepth
-            else:  # numeric solution
-                nstepsz = 100  # no. of steps: depth
-                izz = np.arange(nstepsz + 1)
-                rtrapz = np.ones(nstepsz + 1)
-                rtrapz[0] = rtrapz[-1] = 0.5  # trapezoidal rule
-                
-                z = izz / nstepsz * zdepth
-                Iz = Iin * Icorr * np.exp(-kPARlay * z)
-                psnow = Vp * (1.0 - np.exp(-alpha * Iz / Vp))
-                sumpsz = np.sum(psnow * rtrapz) / nstepsz
-        
-        sumps += sumpsz * rtrapt  # sum photosynthesis over daylight hours
-    
-    Lim_I = sumps / nstepst * daylnow / 24.0  # take account of zero PS during night
-    Lim_I /= Vp  # dimensionless
-    return Lim_I
+    if choiceirrad == 1:
+        irradiance = _TRIANGULAR_IRRADIANCE
+    elif choiceirrad == 2:
+        irradiance = _SINUSOIDAL_IRRADIANCE
+    else:
+        raise ValueError("Unsupported irradiance choice")
+
+    prefactor = Vp / (kPARlay * zdepth)
+
+    if choicePI == 1:
+        x0 = alpha * irradiance * Iin
+        xH = x0 * np.exp(-kPARlay * zdepth)
+        sqrt0 = np.sqrt(Vp * Vp + x0 * x0)
+        sqrtH = np.sqrt(Vp * Vp + xH * xH)
+        sumpsz = prefactor * (np.log(x0 + sqrt0) - np.log(xH + sqrtH))
+    else:
+        istar1 = alpha * irradiance * Iin / Vp
+        istar2 = alpha * irradiance * Iout / Vp
+        diff = np.empty((_NUM_TIME_STEPS, _SERIES_INDICES.shape[0]))
+        for i in range(_NUM_TIME_STEPS):
+            for j in range(_SERIES_INDICES.shape[0]):
+                diff[i, j] = istar1[i] ** _SERIES_INDICES[j] - istar2[i] ** _SERIES_INDICES[j]
+        coeff_sum = diff @ _SERIES_COEFFS
+        sumpsz = coeff_sum * prefactor
+
+    sumps = 0.0
+    for i in range(_NUM_TIME_STEPS):
+        sumps += sumpsz[i] * _TRAPEZOID_WEIGHTS[i]
+    Lim_I = (sumps / _NUM_TIME_STEPS) * daylnow / 24.0
+    return Lim_I / Vp
 
 
 
+@njit(cache=True, fastmath=True)
 def calc_li_A93(zdepth, Iin, Iout, kPARlay, alpha, Vp, daylnow, ahashnow):
-    # Polynomial coefficients for calculating photosynthesis (Platt et al., 1990)
-    omeg = np.array([1.9004, -2.8333E-01, 2.8050E-02, -1.4729E-03, 3.0841E-05])
-    
     # Calculate alphamax
     alphamax = alpha * 2.602  # alphamax is alpha at wavelength of maximum absorption cross section
     
@@ -86,10 +107,10 @@ def calc_li_A93(zdepth, Iin, Iout, kPARlay, alpha, Vp, daylnow, ahashnow):
     V1 = alphamax * ahashnow * Iin / Vp
     V2 = alphamax * ahashnow * Iout / Vp
     
-    # Calculate Qpsnow using vectorized operations
-    powers = np.arange(1, 6)
-    V_terms = V1**powers - V2**powers
-    Qpsnow = V0 * np.sum(omeg * V_terms)
+    V_terms = np.empty(_A93_POWERS.shape[0])
+    for i in range(_A93_POWERS.shape[0]):
+        V_terms[i] = V1 ** _A93_POWERS[i] - V2 ** _A93_POWERS[i]
+    Qpsnow = V0 * np.dot(_A93_OMEGA, V_terms)
     
     # Convert to dimensionless units to get 0 <= J <= 1
     Lim_I = Qpsnow / zdepth / 24.0 / Vp
@@ -97,14 +118,10 @@ def calc_li_A93(zdepth, Iin, Iout, kPARlay, alpha, Vp, daylnow, ahashnow):
     return Lim_I
 
 
+@njit(cache=True, fastmath=True)
 def calc_aphy(ss, ztop, zbottom, aphylast):
+    g = _APHY_COEFF
 
-    # coefficients for calculating a
-    g = np.array([
-        0.048014, 0.00023779, -0.023074, 0.0031095, -0.0090545,
-        0.0027974, 0.00085217, -3.9804E-06, 0.0012398, -0.00061991
-    ])
-    
     # Calculate terms for bottom depth
     x = zbottom + 1.0
     xlg = np.log(x)
