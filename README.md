@@ -49,6 +49,21 @@ python npzd.py
 > faster integrations, so the initial run may take a little longer while the
 > compiled functions are cached.
 
+### Using Remote Forcing Data
+
+Set `source = "remote"` in the `[FORCING]` section of `config.toml` to pull
+mixed-layer depth, sea-surface temperature, and irradiance directly from remote
+providers. The `[FORCING.remote]` block specifies the target location, the time
+range, and an on-disk cache for the downloaded subsets, while each
+`[[FORCING.remote.datasets]]` table defines either an OPeNDAP URL or a
+Copernicus Marine dataset identifier plus the variable to extract and any unit
+conversions. When `dataset_id` is provided the loader calls the Copernicus
+Marine Toolbox (`copernicusmarine.open_dataset`) so you must run
+`copernicusmarine login` (or configure the `COPERNICUSMARINE_USERNAME` and
+`COPERNICUSMARINE_PASSWORD` environment variables) before the model can access
+the data. See `tests/test_remote_forcing.py` for an end-to-end example that
+exercises the loader in both climatology and time-series modes.
+
 ### Running Tests
 
 ```bash
