@@ -1,3 +1,6 @@
 .aider*
 .env
 *pyc
+data/
+CLAUDE.md
+AGENTS.md

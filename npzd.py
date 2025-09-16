@@ -4,6 +4,7 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import tomli
 
+from forcing import RemoteForcingLoader
 from npzd_funcs import day_length, interpolate_monthly_to_daily, noon_par, calc_li_num, calc_li_ep85, calc_li_A93, calc_aphy
 
 class NPZDModel:
@@ -16,30 +17,107 @@ class NPZDModel:
             config = tomli.load(f)
         self.params = config["PARAMETER"]
         self.settings = config["SETUP"]
+        self.forcing_config = config.get("FORCING", {})
 
     def initialize_model(self):
+        self.remote_noon_par_monthly = None
+        self.remote_nutrient_monthly = None
+        self.remote_nutrient_cycle = None
         self.set_station_settings()
         self.interpolate_forcing_data()
         self.precompute_daily_cycles()
 
     def set_station_settings(self):
+        forcing_source = self.forcing_config.get("source", "station").lower()
+        if forcing_source == "remote":
+            self._set_remote_station_settings()
+        else:
+            self._set_local_station_settings()
+
+        self.lat_radian = self.station_settings["lat"] * np.pi / 180
+
+    def _set_local_station_settings(self):
         station = self.settings["flag_stn"]
-        # Station settings
         forcing = pd.read_csv("stations_forcing.txt")
 
-        ## station-specific settings
         station_settings = {
             1: {"lat": 60.0, "clouds": 6.0, "e0": 12.0, "aN": 0.0074, "bN": 10.85, "MLD": forcing.iloc[:13, 0], "SST": forcing.iloc[:13, 1]},
             2: {"lat": 47.0, "clouds": 6.0, "e0": 12.0, "aN": 0.0174, "bN": 4.0, "MLD": forcing.iloc[:13, 2], "SST": forcing.iloc[:13, 3]},
             3: {"lat": -50.67, "clouds": 6.0, "e0": 12.0, "aN": 0, "bN": 26.1, "MLD": forcing.iloc[:13, 6], "SST": forcing.iloc[:13, 7]},
-            4: {"lat": 50.0, "clouds": 6.0, "e0": 12.0, "aN": 0.0, "bN": 14.6, "MLD": forcing.iloc[:13, 4], "SST": forcing.iloc[:13, 5]}
+            4: {"lat": 50.0, "clouds": 6.0, "e0": 12.0, "aN": 0.0, "bN": 14.6, "MLD": forcing.iloc[:13, 4], "SST": forcing.iloc[:13, 5]},
         }
         self.station_settings = station_settings[station]
-        self.lat_radian = self.station_settings["lat"]*np.pi/180
+
+        # Local forcing always uses climatology
+        self.time_coords = None
+        self.use_time_series = False
+
+    def _set_remote_station_settings(self):
+        remote_cfg = self.forcing_config.get("remote")
+        if remote_cfg is None:
+            raise ValueError("FORCING.remote section is required when source='remote'")
+
+        loader = RemoteForcingLoader(remote_cfg)
+        result = loader.load()
+
+        # Handle both climatology and time series data
+        if isinstance(result, tuple):
+            # Time series mode: (data_dict, time_coords)
+            remote_data, self.time_coords = result
+            self.use_time_series = True
+        else:
+            # Climatology mode: just data_dict
+            remote_data = result
+            self.time_coords = None
+            self.use_time_series = False
+
+        if "MLD" not in remote_data or remote_data["MLD"] is None:
+            raise ValueError("Remote forcing must provide an 'MLD' dataset")
+        if "SST" not in remote_data or remote_data["SST"] is None:
+            raise ValueError("Remote forcing must provide an 'SST' dataset")
+
+        self.station_settings = {
+            "lat": remote_cfg["latitude"],
+            "clouds": remote_cfg.get("clouds", 6.0),
+            "e0": remote_cfg.get("e0", 12.0),
+            "aN": remote_cfg.get("aN", 0.0),
+            "bN": remote_cfg.get("bN", 0.0),
+            "MLD": remote_data.get("MLD"),
+            "SST": remote_data.get("SST"),
+        }
+
+        irradiance = remote_data.get("IRRADIANCE")
+        if irradiance is not None:
+            self.remote_noon_par_monthly = irradiance
+
+        nutrient = remote_data.get("NUTRIENT")
+        if nutrient is not None:
+            # Use remote nutrient data directly - no normalization needed
+            # The real oceanographic data already represents realistic mixed layer nutrients
+            self.remote_nutrient_monthly = np.asarray(nutrient, dtype=float)
+            if self.remote_nutrient_monthly.size:
+                # Override the baseline nutrient concentration with the remote mean
+                self.station_settings["bN"] = float(np.nanmean(self.remote_nutrient_monthly))
+        else:
+            self.remote_nutrient_monthly = None
 
     def interpolate_forcing_data(self):
-        self.MLD = interpolate_monthly_to_daily(self.station_settings["MLD"])
-        self.SST = interpolate_monthly_to_daily(self.station_settings["SST"])
+        if self.use_time_series:
+            # For time series data, use directly without interpolation
+            self.MLD = self.station_settings["MLD"]
+            self.SST = self.station_settings["SST"]
+            if self.remote_nutrient_monthly is not None:
+                self.remote_nutrient_cycle = self.remote_nutrient_monthly
+            else:
+                self.remote_nutrient_cycle = None
+        else:
+            # For climatology data, interpolate to daily values
+            self.MLD = interpolate_monthly_to_daily(self.station_settings["MLD"])
+            self.SST = interpolate_monthly_to_daily(self.station_settings["SST"])
+            if self.remote_nutrient_monthly is not None:
+                self.remote_nutrient_cycle = interpolate_monthly_to_daily(self.remote_nutrient_monthly)
+            else:
+                self.remote_nutrient_cycle = None
     
     def precompute_daily_cycles(self):
         if self.settings["flag_force"]:
@@ -47,11 +125,23 @@ class NPZDModel:
             self.noon_par_cycle = None
             return
 
-        days = np.arange(365)
-        clouds = self.station_settings["clouds"]
-        e0 = self.station_settings["e0"]
-        self.day_length_cycle = day_length(days, self.lat_radian)
-        self.noon_par_cycle = noon_par(days, self.lat_radian, clouds, e0)
+        if self.use_time_series:
+            # For time series, we'll compute light values dynamically in the ODE
+            self.day_length_cycle = None
+            if self.remote_noon_par_monthly is not None:
+                self.noon_par_cycle = self.remote_noon_par_monthly  # Use directly
+            else:
+                self.noon_par_cycle = None
+        else:
+            # For climatology, precompute annual cycles
+            days = np.arange(365)
+            self.day_length_cycle = day_length(days, self.lat_radian)
+            if self.remote_noon_par_monthly is not None:
+                self.noon_par_cycle = interpolate_monthly_to_daily(self.remote_noon_par_monthly)
+            else:
+                clouds = self.station_settings["clouds"]
+                e0 = self.station_settings["e0"]
+                self.noon_par_cycle = noon_par(days, self.lat_radian, clouds, e0)
     
     def nutrient_limitation(self, N, kN):
         return N / (kN + N)
@@ -59,8 +149,25 @@ class NPZDModel:
     def temp_limitation(self, T):
         return 1.066**T
 
-    def get_deep_water_nitrate(self, depth, aN, bN):
-        return aN * depth + bN        
+    def get_deep_water_nitrate(self, depth, aN, bN, use_remote=False, remote_value=None):
+        """Calculate deep water nitrate concentration.
+
+        Args:
+            depth: Mixed layer depth (m)
+            aN: Linear coefficient for depth relationship
+            bN: Baseline nutrient concentration
+            use_remote: If True, use remote_value directly
+            remote_value: Remote nutrient data value
+
+        Returns:
+            N0: Deep water nutrient concentration (mmol N m-3)
+        """
+        if use_remote and remote_value is not None:
+            # Use remote data directly - it already represents mixed layer nutrients
+            return remote_value
+        else:
+            # Fall back to linear parameterization
+            return aN * depth + bN        
 
     def calculate_time_step(self, current_step, n_day):
         n_pday= int(1/self.settings["delta_t"])
@@ -79,17 +186,59 @@ class NPZDModel:
             noonparnow = self.settings['force_irradiance']
             daylnow = 12
         else:
-            day_index = int(t)
-            day_in_year = day_index % 365
-            hour_in_day = int((t - day_index) * 24)
+            if self.use_time_series:
+                # For time series data, use time directly as index
+                time_index = min(int(t), len(self.MLD) - 1)
 
-            MLD1 = self.MLD[day_in_year]        
-            MLD2 = self.MLD[day_in_year + 1]            
-            MLDnow = MLD1 + (MLD2 - MLD1) * hour_in_day / 24
-            N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"])
-            SSTnow = self.SST[day_in_year]        
-            noonparnow = self.noon_par_cycle[day_in_year]
-            daylnow = self.day_length_cycle[day_in_year]
+                MLDnow = self.MLD[time_index]
+                # For time series, MLD doesn't change within timestep
+                MLD1 = MLDnow
+                MLD2 = MLDnow
+
+                if self.remote_nutrient_cycle is not None:
+                    remote_nutrient_today = self.remote_nutrient_cycle[time_index]
+                    N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"],
+                                                   use_remote=True, remote_value=remote_nutrient_today)
+                else:
+                    N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"])
+                SSTnow = self.SST[time_index]
+
+                # For time series, compute day length and PAR based on time
+                days_since_start = t
+                if self.time_coords is not None and len(self.time_coords) > 0:
+                    # Convert time coordinate to day of year for light calculations
+                    start_time = pd.to_datetime(self.time_coords[0])
+                    current_time = start_time + pd.Timedelta(days=t)
+                    day_of_year = current_time.timetuple().tm_yday - 1
+                else:
+                    day_of_year = int(t) % 365
+
+                daylnow = day_length(np.array([day_of_year]), self.lat_radian)[0]
+
+                if self.remote_noon_par_monthly is not None and time_index < len(self.remote_noon_par_monthly):
+                    noonparnow = self.remote_noon_par_monthly[time_index]
+                else:
+                    clouds = self.station_settings["clouds"]
+                    e0 = self.station_settings["e0"]
+                    noonparnow = noon_par(np.array([day_of_year]), self.lat_radian, clouds, e0)[0]
+            else:
+                # Original climatology logic
+                day_index = int(t)
+                day_in_year = day_index % 365
+                hour_in_day = int((t - day_index) * 24)
+
+                MLD1 = self.MLD[day_in_year]
+                MLD2 = self.MLD[day_in_year + 1]
+                MLDnow = MLD1 + (MLD2 - MLD1) * hour_in_day / 24
+                if self.remote_nutrient_cycle is not None:
+                    remote_nutrient_today = self.remote_nutrient_cycle[day_in_year]
+                    N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"],
+                                                   use_remote=True, remote_value=remote_nutrient_today)
+                else:
+                    N0 = self.get_deep_water_nitrate(MLDnow, self.station_settings["aN"], self.station_settings["bN"])
+                SSTnow = self.SST[day_in_year]
+                noonparnow = self.noon_par_cycle[day_in_year]
+                daylnow = self.day_length_cycle[day_in_year]
         
         VpT = self.params["Vp0"] * self.temp_limitation(SSTnow)                        
 
@@ -187,9 +336,9 @@ class NPZDModel:
 
 
         if self.settings["flag_force"]:
-            Nmix = self.params["wmix"] * (N0 - N) #rapid mixing for chemostat
+            Nmix = self.params["wmix"] * (N0 - N) # rapid mixing for chemostat
         else:
-           Nmix = self.params["wmix"] * (N0 - N) / MLDnow
+            Nmix = self.params["wmix"] * (N0 - N) / MLDnow
 
         Zgrow = self.params["betaz"] * self.params["kNz"] * (Pgraz + Dgraz)
         Dremin = self.params["mD"] * D
@@ -230,17 +379,25 @@ class NPZDModel:
         return [dPdt, dNdt, dZdt, dDdt]
 
     def run(self):
-        ndays = int(self.settings["nyears"] * 365)
+        if self.use_time_series:
+            # For time series, use the length of the forcing data
+            ndays = len(self.MLD)
+            print(f"Using time series forcing data for {ndays} days ({ndays/365:.1f} years)")
+        else:
+            # For climatology, use the nyears setting
+            ndays = int(self.settings["nyears"] * 365)
+            print(f"Using climatology forcing for {ndays} days ({ndays/365:.1f} years)")
+
         nhr_pday = int(24/self.settings["delta_t"])
         t = np.linspace(0, ndays, ndays * nhr_pday, endpoint=False)
-        X0 = [self.settings["Pinit"], self.settings["Ninit"], 
+        X0 = [self.settings["Pinit"], self.settings["Ninit"],
               self.settings["Zinit"], self.settings["Dsinit"]]
 
 
         print("*************************************")
         print("         Model running")
         print("*************************************")
-        
+
         solution = odeint(self.ode, X0, t)
 
         print("*************************************")

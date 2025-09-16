@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "0D NPZD (Nutrient-Phytoplankton-Zooplankton-Detritus) Dynamic Model"
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 authors = [
     {name = "NPZD Model Developer"}
 ]
@@ -33,6 +33,11 @@ dependencies = [
     "matplotlib",
     "tomli>=1.2.0",
     "numba",
+    "xarray",
+    "pydap",
+    "netCDF4",
+    "jinja2",
+    "copernicusmarine>=2.2.2",
 ]
 
 [project.optional-dependencies]
