@@ -103,6 +103,10 @@ class NPZDModel:
 
     def interpolate_forcing_data(self):
         if self.use_time_series:
+            if self.time_coords is not None and np.any(
+                np.diff(self.time_coords) != np.timedelta64(1, "D")
+            ):
+                raise ValueError("Time-series forcing must have daily samples")
             # For time series data, use directly without interpolation
             self.MLD = self.station_settings["MLD"]
             self.SST = self.station_settings["SST"]
@@ -134,7 +138,7 @@ class NPZDModel:
                 self.noon_par_cycle = None
         else:
             # For climatology, precompute annual cycles
-            days = np.arange(365)
+            days = np.arange(1, 366)
             self.day_length_cycle = day_length(days, self.lat_radian)
             if self.remote_noon_par_monthly is not None:
                 self.noon_par_cycle = interpolate_monthly_to_daily(self.remote_noon_par_monthly)
@@ -190,10 +194,9 @@ class NPZDModel:
                 # For time series data, use time directly as index
                 time_index = min(int(t), len(self.MLD) - 1)
 
-                MLDnow = self.MLD[time_index]
-                # For time series, MLD doesn't change within timestep
-                MLD1 = MLDnow
-                MLD2 = MLDnow
+                MLD1 = self.MLD[time_index]
+                MLD2 = self.MLD[min(time_index + 1, len(self.MLD) - 1)]
+                MLDnow = MLD1 + (MLD2 - MLD1) * (t - int(t))
 
                 if self.remote_nutrient_cycle is not None:
                     remote_nutrient_today = self.remote_nutrient_cycle[time_index]
@@ -204,14 +207,13 @@ class NPZDModel:
                 SSTnow = self.SST[time_index]
 
                 # For time series, compute day length and PAR based on time
-                days_since_start = t
                 if self.time_coords is not None and len(self.time_coords) > 0:
                     # Convert time coordinate to day of year for light calculations
                     start_time = pd.to_datetime(self.time_coords[0])
                     current_time = start_time + pd.Timedelta(days=t)
-                    day_of_year = current_time.timetuple().tm_yday - 1
+                    day_of_year = current_time.timetuple().tm_yday
                 else:
-                    day_of_year = int(t) % 365
+                    day_of_year = int(t) % 365 + 1
 
                 daylnow = day_length(np.array([day_of_year]), self.lat_radian)[0]
 

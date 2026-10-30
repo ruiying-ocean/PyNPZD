@@ -64,6 +64,10 @@ Marine Toolbox (`copernicusmarine.open_dataset`) so you must run
 the data. See `tests/test_remote_forcing.py` for an end-to-end example that
 exercises the loader in both climatology and time-series modes.
 
+Time-series runs require daily forcing samples. Mixed-layer depth is
+interpolated between successive days; deepening entrains nutrients and dilutes
+the existing concentrations. The final depth is held constant on the last day.
+
 ### Running Tests
 
 ```bash
@@ -109,6 +113,11 @@ option2: exponential function
 
 The model is configured via `config.toml`. Key parameters include:
 
+- `delta_t`: Saved output interval in hours (use a value that divides 24 evenly).
+  The adaptive solver chooses its own internal steps. The original R model
+  instead uses a fixed integration step in days, so small numerical differences
+  are expected even with matching parameters and forcing.
+
 - `flag_stn`: Station selection (1-4)
   - Station 1: India (60°N 20°W)
   - Station 2: Biotrans (47°N 20°W)
@@ -150,4 +159,4 @@ NPZD/
 
 ## Reference
 
-Anderson, T. R., Gentleman, W. C., and Sinha, B.: Influence of grazing formulations on the emergent properties of a complex ecosystem model in a global ocean general circulation model, Geosci. Model Dev., 8, 1681–1695, https://doi.org/10.5194/gmd-8-1681-2015, 2015.
+Anderson, T. R., Gentleman, W. C., and Yool, A.: EMPOWER-1.0: an Efficient Model of Planktonic ecOsystems WrittEn in R, Geosci. Model Dev., 8, 2231–2262, https://doi.org/10.5194/gmd-8-2231-2015, 2015.
