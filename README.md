@@ -87,6 +87,18 @@ checks. The unfiltered command above runs everything.
 See [the reference-test guide](tests/reference/README.md) for coverage,
 tolerances, and how to regenerate the expected values from the official code.
 
+### Example comparison with observations
+
+```bash
+uv run --no-sync python examples/compare_observations.py
+```
+
+This produces a four-station chlorophyll and nitrate figure using published
+monthly observational climatologies. The PNG, PDF, and comparison tables are
+saved under `data/examples/empower_observations/`. See the
+[example guide](examples/README.md) for data sources, units, and differences
+from the original EMPOWER figures.
+
 ### Building the Package
 
 ```bash
