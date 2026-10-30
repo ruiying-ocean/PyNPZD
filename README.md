@@ -1,5 +1,8 @@
-# 0D NPZD model re-implemented in Python
-Nutrient-Phytoplankton-Zooplankton-Detritus Dynamic Model, adapted from EMPOWER (Anderson et al. 2015 GMD)
+# PyNPZD
+
+A Python NPZD model based on EMPOWER (Anderson et al. 2015 GMD).
+PyNPZD simulates nutrients, phytoplankton, zooplankton, and detritus in a
+zero-dimensional ocean mixed layer.
 
 ## Quick Start
 
@@ -11,8 +14,8 @@ Nutrient-Phytoplankton-Zooplankton-Detritus Dynamic Model, adapted from EMPOWER 
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd NPZD
+git clone <repository-url> pynpzd
+cd pynpzd
 
 # Install dependencies
 uv sync
@@ -25,8 +28,8 @@ uv sync --extra dev
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd NPZD
+git clone <repository-url> pynpzd
+cd pynpzd
 
 # Install dependencies
 pip install -e .
@@ -39,10 +42,19 @@ pip install -e ".[dev]"
 
 ```bash
 # With uv
-uv run python npzd.py
+uv run pynpzd
 
 # With pip/regular Python
-python npzd.py
+pynpzd
+```
+
+The model can also be imported in Python:
+
+```python
+from pynpzd import NPZDModel
+
+model = NPZDModel("config.toml")
+time, state = model.run()
 ```
 
 > The core light-limitation kernels are JIT-compiled with Numba on first use for
@@ -169,8 +181,8 @@ The NPZD model tracks four state variables:
 ## Project Structure
 
 ```
-NPZD/
-├── npzd.py              # Main model class
+pynpzd/
+├── pynpzd.py            # Main model class and command
 ├── npzd_funcs.py        # Mathematical functions
 ├── config.toml          # Model configuration
 ├── stations_forcing.txt # Station forcing data

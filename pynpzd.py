@@ -1,3 +1,5 @@
+"""PyNPZD: a Python NPZD model based on EMPOWER."""
+
 import numpy as np
 import pandas as pd
 from scipy.integrate import odeint

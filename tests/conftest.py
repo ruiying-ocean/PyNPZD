@@ -13,7 +13,7 @@ sys.path.insert(0, project_root)
 
 @pytest.fixture
 def station_model(monkeypatch):
-    from npzd import NPZDModel
+    from pynpzd import NPZDModel
 
     monkeypatch.chdir(project_root)
     return NPZDModel(Path(__file__).parent / "fixtures/empower/config.toml")

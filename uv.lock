@@ -1687,7 +1687,7 @@ wheels = [
 ]
 
 [[package]]
-name = "npzd-model"
+name = "pynpzd"
 version = "0.3.0"
 source = { editable = "." }
 dependencies = [

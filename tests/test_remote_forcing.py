@@ -3,7 +3,7 @@ import pandas as pd
 import xarray as xr
 
 from forcing import RemoteForcingLoader
-from npzd import NPZDModel
+from pynpzd import NPZDModel
 
 
 def _make_test_dataset(path):

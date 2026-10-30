@@ -54,7 +54,7 @@ def load_observations(path: Path = OBSERVATIONS) -> pd.DataFrame:
 
 def simulate_stations() -> pd.DataFrame:
     """Run five years at each station with the parameters published in Table 3."""
-    from npzd import NPZDModel
+    from pynpzd import NPZDModel
 
     results = []
     for station, (number, _, overrides) in STATIONS.items():
