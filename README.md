@@ -121,6 +121,13 @@ print("Year-five peak P, N, Z, D:", state[final_year].max(axis=0).round(2))
 model.plot_results(time, state)
 ```
 
+Year five of this run, with the mixed-layer forcing that drives it. Deep winter
+mixing supplies nitrate; the spring bloom follows the shoaling mixed layer and
+is grazed down by zooplankton. Regenerate it with
+`uv run --no-sync python examples/plot_station_cycle.py`.
+
+![Three stacked panels for BIOTRANS, year five. Mixed-layer depth deepens to about 550 m in March and shoals to about 25 m by July. Nitrate stays near 8 mmol N per cubic metre until April, then falls to near zero by July and recovers through winter. Phytoplankton peaks at about 0.86 mmol N per cubic metre in early May, followed by zooplankton at about 0.58 and detritus at about 0.4.](https://raw.githubusercontent.com/ruiying-ocean/PyNPZD/main/docs/figures/station_cycle.png)
+
 ### Change the station, light method, or parameters
 
 Edit `settings` and `params` after loading a config, then call
@@ -150,6 +157,8 @@ monthly observational climatologies. The PNG, PDF, and comparison tables are
 saved under `data/examples/empower_observations/`. See the
 [example guide](examples/README.md) for data sources, units, and differences
 from the original EMPOWER figures.
+
+![Eight panels comparing model and observed monthly climatologies of chlorophyll (left) and nitrate (right) at BIOTRANS, India, Papa and KERFIX. Model curves and monthly means are plotted against observed monthly values. Chlorophyll RMSE is 0.10 to 0.27 mg per cubic metre and nitrate RMSE is 1.02 to 1.56 mmol N per cubic metre. The model underestimates summer chlorophyll at India.](https://raw.githubusercontent.com/ruiying-ocean/PyNPZD/main/docs/figures/empower_observations.png)
 
 ## Model Description
 

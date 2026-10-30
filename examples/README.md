@@ -99,7 +99,8 @@ handling rather than requiring an arbitrary fit to observations.
 ## Software acknowledgment
 
 Plots use NumPy, pandas, and Matplotlib already installed for this project.
-Figure preparation followed the scientific-visualization skill from
+Figure preparation for this example and `plot_station_cycle.py` followed the
+scientific-visualization skill from
 Kassis, T., Agarwal, V., He, Y., Patel, D., and Brueckner, A. M. (2026),
 *Scientific Agent Skills: A Library of Procedural Knowledge for Research
 Agents*, [arXiv:2609.00065](https://doi.org/10.48550/arXiv.2609.00065).
