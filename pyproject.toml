@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pynpzd"
-version = "0.3.0"
+version = "0.4.0"
 description = "A Python NPZD model based on EMPOWER"
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     {name = "NPZD Model Developer"}
 ]
@@ -17,10 +17,8 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Atmospheric Science",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -47,7 +45,7 @@ dev = [
 ]
 
 [project.scripts]
-pynpzd = "pynpzd:main"
+pynpzd = "pynpzd.model:main"
 
 [tool.pytest.ini_options]
 markers = [
@@ -56,7 +54,7 @@ markers = [
 ]
 
 [tool.hatch.build.targets.wheel]
-include = ["/pynpzd.py", "/npzd_funcs.py", "/forcing.py"]
+packages = ["pynpzd"]
 
 [tool.hatch.build.targets.sdist]
 include = [

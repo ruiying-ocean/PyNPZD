@@ -4,6 +4,6 @@ __all__ = [
     "NPZDModel",
 ]
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
-from .pynpzd import NPZDModel
+from pynpzd.model import NPZDModel

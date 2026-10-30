@@ -1,13 +1,15 @@
 """PyNPZD: a Python NPZD model based on EMPOWER."""
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import tomli
 
-from forcing import RemoteForcingLoader
-from npzd_funcs import day_length, interpolate_monthly_to_daily, noon_par, calc_li_num, calc_li_ep85, calc_li_A93, calc_aphy
+from pynpzd.forcing import RemoteForcingLoader
+from pynpzd.npzd_funcs import day_length, interpolate_monthly_to_daily, noon_par, calc_li_num, calc_li_ep85, calc_li_A93, calc_aphy
 
 class NPZDModel:
     def __init__(self, config_file):
@@ -40,7 +42,7 @@ class NPZDModel:
 
     def _set_local_station_settings(self):
         station = self.settings["flag_stn"]
-        forcing = pd.read_csv("stations_forcing.txt")
+        forcing = pd.read_csv(Path(__file__).with_name("stations_forcing.txt"))
 
         station_settings = {
             1: {"lat": 60.0, "clouds": 6.0, "e0": 12.0, "aN": 0.0074, "bN": 10.85, "MLD": forcing.iloc[:13, 0], "SST": forcing.iloc[:13, 1]},

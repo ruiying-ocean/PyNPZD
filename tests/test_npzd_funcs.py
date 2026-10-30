@@ -1,4 +1,4 @@
-from npzd_funcs import *
+from pynpzd.npzd_funcs import *
 
 def test_calc_li_num():
     "original: FNLIcalcNu"

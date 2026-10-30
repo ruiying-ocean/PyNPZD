@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from npzd_funcs import calc_aphy, calc_li_A93, calc_li_ep85, calc_li_num
+from pynpzd.npzd_funcs import calc_aphy, calc_li_A93, calc_li_ep85, calc_li_num
 
 
 pytestmark = pytest.mark.empower
@@ -17,7 +17,7 @@ CHOICES = [(1, 1, 1), (1, 1, 2), (1, 2, 1), (1, 2, 2), (2, 2, 1), (3, 2, 1)]
 
 
 def test_station_table_matches_original():
-    actual = pd.read_csv(Path(__file__).parents[1] / "stations_forcing.txt")
+    actual = pd.read_csv(Path(__file__).parents[1] / "pynpzd/stations_forcing.txt")
     reference = pd.read_csv(REFERENCE / "station_table.csv")
     np.testing.assert_array_equal(actual.to_numpy(), reference.to_numpy())
 

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from forcing import RemoteForcingLoader
+from pynpzd.forcing import RemoteForcingLoader
 from pynpzd import NPZDModel
 
 

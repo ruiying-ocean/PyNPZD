@@ -181,13 +181,15 @@ The NPZD model tracks four state variables:
 ## Project Structure
 
 ```
-pynpzd/
-├── pynpzd.py            # Main model class and command
-├── npzd_funcs.py        # Mathematical functions
-├── config.toml          # Model configuration
-├── stations_forcing.txt # Station forcing data
-├── tests/               # Test suite
-├── pyproject.toml       # Package configuration
+pynpzd/                      # Repository
+├── pynpzd/                  # Installable package
+│   ├── model.py             # Main model class and command
+│   ├── npzd_funcs.py        # Mathematical functions
+│   ├── forcing.py           # Remote forcing loader
+│   └── stations_forcing.txt # Station forcing data
+├── config.toml              # Model configuration
+├── tests/                   # Test suite
+├── pyproject.toml           # Package configuration
 ```
 
 ## Reference
