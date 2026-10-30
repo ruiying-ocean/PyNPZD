@@ -107,7 +107,7 @@ class RemoteForcingLoader:
         start: np.datetime64,
         end: np.datetime64,
     ) -> Tuple[np.ndarray, np.ndarray | None]:
-        cache_path = self._cache_path(dataset, start, end)
+        cache_path = self._cache_path(dataset, start, end, latitude, longitude)
         if cache_path.exists():
             ds = xr.open_dataset(cache_path)
         else:
@@ -162,7 +162,7 @@ class RemoteForcingLoader:
         processed_data = self._to_monthly_cycle(data_array, dataset.time_coord)
         return processed_data, time_coords
 
-    def _cache_path(self, dataset: DatasetConfig, start: np.datetime64, end: np.datetime64) -> Path:
+    def _cache_path(self, dataset: DatasetConfig, start: np.datetime64, end: np.datetime64, latitude: float = None, longitude: float = None) -> Path:
         cache_key = {
             "url": str(dataset.url) if dataset.url is not None else None,
             "dataset_id": dataset.dataset_id,
@@ -170,6 +170,8 @@ class RemoteForcingLoader:
             "time_coord": dataset.time_coord,
             "lat_coord": dataset.lat_coord,
             "lon_coord": dataset.lon_coord,
+            "latitude": latitude,
+            "longitude": longitude,
             "selection": dataset.selection,
             "start": str(start),
             "end": str(end),

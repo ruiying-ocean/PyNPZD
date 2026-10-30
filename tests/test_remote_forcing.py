@@ -59,6 +59,39 @@ def test_remote_forcing_loader_returns_monthly_cycles(tmp_path):
     np.testing.assert_allclose(data["NUTRIENT"], np.concatenate([np.arange(1, 13, dtype=float) * 2.0, [2.0]]))
 
 
+def test_remote_forcing_cache_separates_locations(tmp_path):
+    dataset_path = tmp_path / "locations.nc"
+    xr.Dataset(
+        {"sst": (("time", "lat", "lon"), np.arange(8.0).reshape(2, 2, 2))},
+        coords={
+            "time": pd.date_range("2018-01-01", periods=2, freq="MS"),
+            "lat": [50.0, 51.0],
+            "lon": [-145.0, -144.0],
+        },
+    ).to_netcdf(dataset_path)
+    config = {
+        "time_start": "2018-01-01",
+        "time_end": "2018-02-01",
+        "cache_dir": tmp_path / "cache",
+        "use_climatology": False,
+        "datasets": [
+            {"target": "SST", "url": dataset_path, "variable": "sst", "engine": "netcdf4"},
+        ],
+    }
+
+    for latitude, longitude, expected in [
+        (50.0, -145.0, [0.0, 4.0]),
+        (51.0, -145.0, [2.0, 6.0]),
+        (50.0, -144.0, [1.0, 5.0]),
+        (50.0, -145.0, [0.0, 4.0]),
+    ]:
+        loader = RemoteForcingLoader(
+            {**config, "latitude": latitude, "longitude": longitude}
+        )
+        data, _ = loader.load()
+        np.testing.assert_array_equal(data["SST"], expected)
+
+
 def test_model_initializes_with_remote_forcing(tmp_path):
     dataset_path = tmp_path / "test_forcing.nc"
     _make_test_dataset(dataset_path)
