@@ -114,111 +114,76 @@ def comparison_metrics(monthly: pd.DataFrame) -> pd.DataFrame:
 def plot_comparison(
     model: pd.DataFrame, monthly: pd.DataFrame, metrics: pd.DataFrame, output: Path
 ) -> None:
-    """Save an eight-panel comparison as PNG and vector PDF."""
+    """Save a four-station, two-variable comparison as PNG and vector PDF."""
+    ink, muted, model_colour, observed_colour = "#222222", "#6b6b6b", "#0072B2", "#D55E00"
     style = {
-        "font.size": 10,
-        "axes.titlesize": 11,
-        "axes.labelsize": 10,
+        "font.size": 9,
+        "axes.edgecolor": muted,
         "axes.spines.top": False,
         "axes.spines.right": False,
+        "xtick.color": muted,
+        "ytick.color": muted,
+        "xtick.labelcolor": ink,
+        "ytick.labelcolor": ink,
         "pdf.fonttype": 42,
     }
+    columns = [
+        ("chlorophyll", "chlorophyll", "Chlorophyll (mg m$^{-3}$)"),
+        ("nitrate", "N", "Nitrate (mmol N m$^{-3}$)"),
+    ]
     with plt.rc_context(style):
-        fig, axes = plt.subplots(4, 2, figsize=(10, 11), sharex=True, sharey="col")
+        fig, axes = plt.subplots(4, 2, figsize=(9, 9), sharex=True, sharey="col")
         fig.subplots_adjust(
-            left=0.09, right=0.97, bottom=0.11, top=0.86, hspace=0.39, wspace=0.24
+            left=0.07, right=0.98, top=0.80, bottom=0.10, hspace=0.45, wspace=0.14
         )
-        fig.suptitle("NPZD and observed seasonal cycles", fontsize=19, y=0.975)
-        fig.text(
-            0.5,
-            0.941,
-            "Year 5 · Published EMPOWER station parameters · No fitting to these observations",
-            ha="center",
-            fontsize=10,
-        )
+        fig.text(0.07, 0.965, "Simulated and observed seasonal cycles",
+                 fontsize=15, weight="bold", color=ink)
+        fig.text(0.07, 0.937, "Year 5 of 5 · published EMPOWER station parameters · "
+                 "not fitted to these observations", fontsize=9.5, color=muted)
         for row, (station, (_, label, _)) in enumerate(STATIONS.items()):
             simulated = model[model.station == station]
             paired = monthly[monthly.station == station]
-            for col, (variable, field, ylabel) in enumerate(
-                [
-                    ("chlorophyll", "chlorophyll", "Chlorophyll (mg m$^{-3}$)"),
-                    ("nitrate", "N", "Nitrate (mmol N m$^{-3}$)"),
-                ]
-            ):
+            for col, (variable, field, _) in enumerate(columns):
                 ax = axes[row, col]
-                ax.plot(
-                    simulated.day,
-                    simulated[field],
-                    color="#0072B2",
-                    lw=1.8,
-                    label="Model: seasonal curve",
-                    zorder=2,
-                )
-                ax.scatter(
-                    MONTH_CENTRES,
-                    paired[f"model_{variable}"],
-                    marker="s",
-                    s=24,
-                    facecolors="white",
-                    edgecolors="#0072B2",
-                    linewidths=1.1,
-                    label="Model: monthly mean",
-                    zorder=4,
-                )
-                ax.scatter(
-                    MONTH_CENTRES,
-                    paired[f"observed_{variable}"],
-                    s=25,
-                    color="#222222",
-                    marker="o",
-                    label="Observed monthly climatology",
-                    zorder=5,
-                )
+                ax.plot(simulated.day, simulated[field], color=model_colour, lw=1.8,
+                        label="Model, daily", zorder=2)
+                ax.scatter(MONTH_CENTRES, paired[f"model_{variable}"], marker="s",
+                           s=16, facecolors="white", edgecolors=model_colour,
+                           linewidths=1, label="Model, monthly mean", zorder=3)
+                ax.scatter(MONTH_CENTRES, paired[f"observed_{variable}"], s=24,
+                           color=observed_colour, edgecolors="white", linewidths=0.6,
+                           label="Observed, monthly climatology", zorder=4)
                 metric = metrics[
                     (metrics.station == station) & (metrics.variable == variable)
                 ].iloc[0]
-                ax.text(
-                    0.97,
-                    0.93,
-                    f"RMSE {metric.rmse:.2f} · {metric.months}/12 months",
-                    ha="right",
-                    va="top",
-                    transform=ax.transAxes,
-                    fontsize=9,
-                    bbox={
-                        "facecolor": "white",
-                        "edgecolor": "none",
-                        "alpha": 0.9,
-                        "pad": 2,
-                    },
-                )
-                ax.set_title(f"{chr(97 + 2 * row + col)}) {label}", loc="left", pad=8)
-                ax.set_ylabel(ylabel)
-                ax.set_xlim(0, 365)
-                ax.set_xticks(MONTH_CENTRES, list("JFMAMJJASOND"))
-                ax.grid(axis="y", color="#dddddd", lw=0.6)
+                ax.set_title(label, loc="left", fontsize=9.5, weight="bold", color=ink)
+                ax.set_title(f"RMSE {metric.rmse:.2f} · {metric.months}/12 months",
+                             loc="right", fontsize=8, color=muted)
+                ax.grid(axis="y", color="#e8e8e8", lw=0.7)
                 ax.set_axisbelow(True)
-        for col in range(2):
-            axes[0, col].set_ylim(0, axes[0, col].get_ylim()[1] * 1.12)
-            axes[-1, col].set_xlabel("Month")
+                ax.tick_params(length=3)
+        for col, (_, _, header) in enumerate(columns):
+            ticks = axes[0, col].get_yticks()
+            data_max = max(ax.dataLim.ymax for ax in axes[:, col])
+            # End each shared axis on a labelled tick so no column looks cut off.
+            axes[0, col].set_ylim(0, np.ceil(data_max / (ticks[1] - ticks[0])) * (ticks[1] - ticks[0]))
+            fig.text(axes[0, col].get_position().x0, 0.845, header,
+                     fontsize=11, weight="bold", color=ink)
+        axes[-1, 0].set_xlim(0, 365)
+        axes[-1, 0].set_xticks(MONTH_CENTRES, list("JFMAMJJASOND"))
         handles, labels = axes[0, 0].get_legend_handles_labels()
-        fig.legend(
-            handles,
-            labels,
-            loc="upper center",
-            bbox_to_anchor=(0.5, 0.921),
-            ncol=3,
-            frameon=False,
-            fontsize=9,
-        )
+        fig.legend(handles, labels, loc="upper left", bbox_to_anchor=(0.06, 0.92),
+                   ncol=3, frameon=False, fontsize=9, handletextpad=0.4,
+                   columnspacing=1.6)
         fig.text(
-            0.09,
-            0.052,
-            "Observations: MODIS-Aqua chlorophyll and WOA2018 mixed-layer nitrate, distributed with Phydra (Post et al., 2024).\n"
-            "Missing satellite months remain blank. RMSE uses paired monthly means; no observational uncertainty was supplied.\n"
-            "Updated climatologies and original EMPOWER forcing: this is not an exact reproduction of the 2015 figures.",
-            fontsize=8,
-            va="center",
+            0.07,
+            0.03,
+            "Observations: MODIS-Aqua chlorophyll and WOA2018 mixed-layer nitrate via Phydra "
+            "(Post et al., 2024); blank months have no satellite data.\nRMSE uses paired "
+            "monthly means; no observational uncertainty was supplied. Updated climatologies, "
+            "so not an exact reproduction of the 2015 figures.",
+            fontsize=7.5,
+            color=muted,
             linespacing=1.5,
         )
         for extension in ("png", "pdf"):

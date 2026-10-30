@@ -78,7 +78,7 @@ CtoChl = 75 g C / g chlorophyll
 ```
 
 The blue curve shows the simulated final-year cycle. Open blue squares show
-model monthly means, and dark circles show the observational climatology.
+model monthly means, and orange-red circles show the observational climatology.
 Months use a 365-day calendar; model samples are assigned to half-open
 calendar-month intervals and averaged at their uniform 2.4-hour spacing.
 Observed points are positioned at month centres. The underlying values are
