@@ -1,11 +1,6 @@
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pytest
-
-
-FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.mark.parametrize("next_depth", [90.0, 100.0, 110.0])
@@ -47,38 +42,6 @@ def test_time_series_sunlight_matches_calendar_day(station_model, start, time, d
     if start is not None:
         model.time_coords = pd.date_range(start, periods=2).values
     np.testing.assert_allclose(model.ode(state, time), expected, atol=1e-12)
-
-
-@pytest.mark.parametrize("station", [1, 2, 3, 4])
-def test_daily_sunlight_matches_original_r(station_model, station):
-    model = station_model
-    model.settings["flag_stn"] = station
-    model.initialize_model()
-    reference = pd.read_csv(FIXTURES / "empower_sunlight.csv", comment="#")
-    reference = reference[reference.station == station]
-    days = reference.day.to_numpy() - 1
-    np.testing.assert_allclose(model.day_length_cycle[days], reference.day_length)
-    np.testing.assert_allclose(model.noon_par_cycle[days], reference.noon_par)
-
-
-def test_rates_match_original_r(station_model):
-    model = station_model
-    choices = [(1, 1, 1), (1, 1, 2), (1, 2, 1), (1, 2, 2), (2, 2, 1), (3, 2, 1)]
-    reference = pd.read_csv(FIXTURES / "empower_rates.csv", comment="#")
-    for row in reference.itertuples():
-        li, irradiance, pi_curve = choices[row.choice - 1]
-        model.settings.update(
-            flag_LI=li,
-            flag_irrad=irradiance,
-            flag_PIcurve=pi_curve,
-            flag_atten=row.atten,
-            flag_grazing=row.grazing,
-        )
-        model.MLD = np.full(366, float(row.depth))
-        model.MLD[row.day] += row.change
-        model.SST = np.full(366, 10.0)
-        actual = model.ode([row.P, 2.0, 0.2, 0.3], row.day - 1 + 0.5)
-        np.testing.assert_allclose(actual, [row.dP, row.dN, row.dZ, row.dD], atol=1e-12)
 
 
 def test_time_series_rejects_non_daily_forcing(station_model):

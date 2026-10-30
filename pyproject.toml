@@ -49,6 +49,12 @@ dev = [
 [project.scripts]
 npzd = "npzd:main"
 
+[tool.pytest.ini_options]
+markers = [
+    "empower: comparisons against the published EMPOWER-1.0 R implementation",
+    "slow: five-year simulation comparisons",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["."]
 

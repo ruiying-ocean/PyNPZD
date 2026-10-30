@@ -1,0 +1,39 @@
+# Generated from the official EMPOWER-1.0 inputs; independent of config.toml.
+[PARAMETER]
+Vp0 = 2.5
+alpha = 0.15
+kN = 0.85
+mP = 0.015
+mP2 = 0.025
+Imax = 1
+kz = 0.6
+phiP = 0.67
+phiD = 0.33
+betaz = 0.69
+kNz = 0.75
+mz = 0.02
+mz2 = 0.34
+VD = 6.43
+mD = 0.06
+wmix = 0.13
+CtoChl = 75
+kw = 0.04
+kc = 0.03
+
+[SETUP]
+Pinit = 0.1
+Ninit = 10
+Zinit = 0.1
+Dsinit = 0.1
+nyears = 5
+flag_stn = 2
+flag_LI = 1
+flag_atten = 2
+flag_irrad = 2
+flag_PIcurve = 1
+flag_grazing = 2
+delta_t = 2.4 # hours between Python outputs
+flag_force = false
+
+[FORCING]
+source = "station"

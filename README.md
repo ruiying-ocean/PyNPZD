@@ -78,6 +78,15 @@ uv run pytest tests/
 python -m pytest tests/
 ```
 
+The suite includes comparisons with the original EMPOWER-1.0 R model, using
+checked-in reference outputs. R and network access are not needed to run them.
+Use `uv run pytest tests/ -m "empower and not slow"` for the quick reference
+checks, or `uv run pytest tests/ -m empower` to include both five-year simulation
+checks. The unfiltered command above runs everything.
+
+See [the reference-test guide](tests/reference/README.md) for coverage,
+tolerances, and how to regenerate the expected values from the official code.
+
 ### Building the Package
 
 ```bash
