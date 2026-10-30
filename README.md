@@ -7,14 +7,14 @@ zero-dimensional ocean mixed layer.
 ## Quick Start
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.10+
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
 ### Installation with uv (recommended)
 
 ```bash
 # Clone the repository
-git clone <repository-url> pynpzd
+git clone https://github.com/ruiying-ocean/PyNPZD.git pynpzd
 cd pynpzd
 
 # Install dependencies
@@ -28,7 +28,7 @@ uv sync --extra dev
 
 ```bash
 # Clone the repository
-git clone <repository-url> pynpzd
+git clone https://github.com/ruiying-ocean/PyNPZD.git pynpzd
 cd pynpzd
 
 # Install dependencies
@@ -48,14 +48,11 @@ uv run pynpzd
 pynpzd
 ```
 
-The model can also be imported in Python:
-
-```python
-from pynpzd import NPZDModel
-
-model = NPZDModel("config.toml")
-time, state = model.run()
-```
+The command runs the `config.toml` in the current folder and plots the results.
+The repository's `config.toml` uses remote Copernicus forcing (see
+[Using Remote Forcing Data](#using-remote-forcing-data)). To run without
+credentials, use a station config such as `examples/empower_observations.toml`.
+See [Examples](#examples) for Python usage.
 
 > The core light-limitation kernels are JIT-compiled with Numba on first use for
 > faster integrations, so the initial run may take a little longer while the
@@ -99,7 +96,50 @@ checks. The unfiltered command above runs everything.
 See [the reference-test guide](tests/reference/README.md) for coverage,
 tolerances, and how to regenerate the expected values from the official code.
 
-### Example comparison with observations
+### Building the Package
+
+```bash
+# Build wheel and source distribution
+uv build
+```
+
+## Examples
+
+### Run a station simulation
+
+This runs five years at BIOTRANS (47°N, 20°W) with the original EMPOWER-1.0
+inputs and the built-in station forcing, so nothing is downloaded:
+
+```python
+from pynpzd import NPZDModel
+
+model = NPZDModel("examples/empower_observations.toml")
+time, state = model.run()  # time in days; state columns are P, N, Z, D (mmol N m⁻³)
+
+final_year = time >= 4 * 365
+print("Year-five peak P, N, Z, D:", state[final_year].max(axis=0).round(2))
+model.plot_results(time, state)
+```
+
+### Change the station, light method, or parameters
+
+Edit `settings` and `params` after loading a config, then call
+`initialize_model()` so the station forcing is reloaded:
+
+```python
+from pynpzd import NPZDModel
+
+model = NPZDModel("examples/empower_observations.toml")
+model.settings["flag_stn"] = 4  # Papa (50°N, 145°W)
+model.settings["flag_LI"] = 2   # Evans & Parslow (1985) light limitation
+model.params.update(Vp0=1.25, alpha=0.075, Imax=1.25)  # Papa values, Table 3
+model.initialize_model()
+time, state = model.run()
+```
+
+See [Configuration](#configuration) for every station and flag.
+
+### Compare with observations
 
 ```bash
 uv run --no-sync python examples/compare_observations.py
@@ -110,13 +150,6 @@ monthly observational climatologies. The PNG, PDF, and comparison tables are
 saved under `data/examples/empower_observations/`. See the
 [example guide](examples/README.md) for data sources, units, and differences
 from the original EMPOWER figures.
-
-### Building the Package
-
-```bash
-# Build wheel and source distribution
-uv build
-```
 
 ## Model Description
 
