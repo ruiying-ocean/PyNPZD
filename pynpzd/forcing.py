@@ -218,7 +218,7 @@ class RemoteForcingLoader:
 
         if use_climatology:
             # Collapse multiple years into a climatological monthly cycle
-            monthly = data_array.groupby(f"{time_coord}.month").mean("time")
+            monthly = data_array.groupby(f"{time_coord}.month").mean(time_coord)
             monthly = monthly.sortby("month")
             values = monthly.values.astype(float)
             if values.shape[0] < 12:
